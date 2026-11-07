@@ -1,0 +1,54 @@
+{
+  "startBalanceUsd": 1000,
+  "positionPct": 0.1,
+  "copyPositionPct": 0.15,
+  "maxOpen": 5,
+  "cooldownMin": 120,
+
+  "costs": {
+    "feePctPerSide": 0.01,
+    "_note": "1% per side = DEX fee + priority fee + Jito tip; price impact is added on top from pool liquidity"
+  },
+
+  "entry": {
+    "minLiquidityUsd": 20000,
+    "maxLiquidityUsd": 3000000,
+    "minMcapUsd": 80000,
+    "maxMcapUsd": 30000000,
+    "minAgeMin": 15,
+    "maxAgeHours": 48,
+    "minBuysM5": 25,
+    "minBuyRatioM5": 1.2,
+    "minBuyRatioH1": 1.05,
+    "minChangeM5": 1,
+    "maxChangeM5": 20,
+    "minChangeH1": 5,
+    "maxChangeH1": 400,
+    "minVolLiqH1": 0.3,
+    "maxRugScore": 40,
+    "minScore": 0
+  },
+
+  "exit": {
+    "stopLossPct": -0.18,
+    "tp1Pct": 0.4,
+    "tp1SellFraction": 0.5,
+    "trailPct": 0.25,
+    "hardTpPct": 3,
+    "staleMin": 90,
+    "staleMinGainPct": 0.1,
+    "maxHoldMin": 480,
+    "liqDropPct": 0.5,
+    "missingTicks": 10
+  },
+
+  "copy": {
+    "_note": "Add Solana wallet addresses of traders you want to copy (find them on gmgn.ai / birdeye / cielo leaderboards).",
+    "wallets": [],
+    "relaxedEntry": {
+      "minLiquidityUsd": 10000,
+      "minChangeM5": -5,
+      "minBuyRatioM5": 1
+    }
+  }
+}

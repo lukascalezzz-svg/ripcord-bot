@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="sr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ripcord</title>
+<meta name="description" content="Dnevni dnevnik paper-trading bota za Solana meme coinove.">
+<meta name="theme-color" content="#E8EEEA" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#13294B" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M3 14a13 11 0 0 1 26 0z' fill='%231C2B5A'/%3E%3Cpath d='M4 14l12 13 12-13M16 14v13' stroke='%231C2B5A' stroke-width='1.6' fill='none'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=Instrument+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#E8EEEA; --grid:#CFDCD4; --grid-major:#B7C9BE; --ink:#1C2B5A; --ink-2:#44506F; --muted:#5E6B66;
+  --up:#0A8C5E; --down:#C93A2B; --up-wash:#B9E2CC; --down-wash:#F3C6BE; --hl:#F2E14C; --card:#F4F7F5; --line:#C3D2C9;
+  --flat:#C9D2CD;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#13294B; --grid:#1D355C; --grid-major:#29467A; --ink:#EAF0FA; --ink-2:#B9C6DD; --muted:#93A4C2;
+  --up:#1FA676; --down:#EC6150; --up-wash:#17594A; --down-wash:#6A2E3A; --hl:#8C7F1E; --card:#17305A; --line:#2B4A7D; --flat:#2E4670;
+}}
+:root[data-theme="dark"]{
+  --paper:#13294B; --grid:#1D355C; --grid-major:#29467A; --ink:#EAF0FA; --ink-2:#B9C6DD; --muted:#93A4C2;
+  --up:#1FA676; --down:#EC6150; --up-wash:#17594A; --down-wash:#6A2E3A; --hl:#8C7F1E; --card:#17305A; --line:#2B4A7D; --flat:#2E4670;
+}
+*{box-sizing:border-box;margin:0}
+html{-webkit-text-size-adjust:100%}
+body{
+  background-color:var(--paper);
+  background-image:
+    linear-gradient(var(--grid-major) 1px,transparent 1px),linear-gradient(90deg,var(--grid-major) 1px,transparent 1px),
+    linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:100px 100px,100px 100px,20px 20px,20px 20px;
+  color:var(--ink); font:16px/1.5 "Instrument Sans",system-ui,sans-serif; min-height:100vh;
+  font-variant-numeric:tabular-nums;
+}
+.wrap{max-width:1120px;margin:0 auto;padding:20px 16px 64px}
+h1,h2,.num{font-family:"Bricolage Grotesque",system-ui,sans-serif}
+h2{font-size:1.25rem;font-weight:600;letter-spacing:-.01em}
+button{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--hl);outline-offset:2px;border-radius:4px}
+
+/* header */
+.top{display:flex;align-items:center;gap:6px 12px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;font-size:1.35rem;font-weight:800;letter-spacing:-.02em;font-family:"Bricolage Grotesque",sans-serif}
+.brand svg{width:34px;height:34px}
+.mode{color:var(--muted);font-size:.9rem}
+.live{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:.9rem;color:var(--ink-2)}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--up);animation:ping 2.4s infinite}
+.dot.stale{background:var(--down);animation:none}
+@keyframes ping{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--up) 60%,transparent)}100%{box-shadow:0 0 0 9px transparent}}
+.theme{border:1px solid var(--line);background:var(--card);border-radius:8px;width:36px;height:36px;cursor:pointer;display:grid;place-items:center}
+
+/* hero */
+.hero{margin-top:36px;display:grid;gap:8px}
+.hero .label{color:var(--ink-2);font-size:1rem}
+.big{font-size:clamp(3.6rem,16vw,8.5rem);font-weight:800;line-height:.95;letter-spacing:-.045em;position:relative;isolation:isolate;width:max-content;max-width:100%}
+.big .swipe{position:absolute;left:-2%;right:-4%;bottom:6%;height:42%;background:var(--hl);z-index:-1;border-radius:3px 14px 6px 10px;transform-origin:left;transform:scaleX(0) skewX(-6deg);transition:transform .7s cubic-bezier(.2,.8,.2,1) .5s}
+.big.on .swipe{transform:scaleX(1) skewX(-6deg)}
+.big.up .swipe{background:var(--up-wash)} .big.down .swipe{background:var(--down-wash)}
+.big .pct{font-size:.32em;font-weight:600;letter-spacing:-.01em;color:var(--ink-2);margin-left:.25em}
+.verdict{max-width:62ch;font-size:1.1rem;color:var(--ink);margin-top:8px}
+.stats{display:flex;flex-wrap:wrap;gap:12px 28px;margin-top:18px;padding-top:16px;border-top:2px solid var(--ink)}
+.stat b{display:block;font:600 1.5rem/1.2 "Bricolage Grotesque",sans-serif;letter-spacing:-.02em}
+.stat span{color:var(--muted);font-size:.88rem}
+
+/* sheet = a page laid on the grid */
+.sheet{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:18px;margin-top:28px;position:relative;min-width:0}
+.sheet header{display:flex;align-items:baseline;gap:4px 12px;flex-wrap:wrap;margin-bottom:12px}
+.sheet header p{color:var(--muted);font-size:.9rem}
+.grid2{display:grid;gap:0 28px}
+@media(min-width:900px){.grid2{grid-template-columns:1fr 1fr}}
+
+/* equity chart */
+.chart{position:relative;height:260px;touch-action:pan-y}
+.chart svg{width:100%;height:100%;overflow:visible;display:block}
+.eq-line{fill:none;stroke:var(--ink);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.eq-area{opacity:.55}
+.base{stroke:var(--ink-2);stroke-width:1;stroke-dasharray:5 5}
+.axis text{fill:var(--muted);font-size:11px}
+.cross{stroke:var(--ink-2);stroke-width:1;opacity:0}
+.knob{fill:var(--card);stroke:var(--ink);stroke-width:2;opacity:0}
+.tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--paper);padding:6px 10px;border-radius:6px;font-size:.85rem;white-space:nowrap;opacity:0;transform:translate(-50%,-130%);transition:opacity .12s}
+.chart.hover .cross,.chart.hover .knob,.chart.hover .tip{opacity:1}
+
+/* days */
+.days{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.day{aspect-ratio:1;border:0;border-radius:5px;background:var(--flat);cursor:pointer;display:flex;flex-direction:column;justify-content:space-between;padding:5px;font-size:.72rem;text-align:left;color:var(--ink);min-width:0;overflow:hidden}
+.day .d{color:var(--ink-2)} .day .v{font-weight:700;font-size:.78rem}
+.day.empty{background:transparent;outline:1px dashed var(--line);outline-offset:-1px;cursor:default}
+.day.loss{background-image:repeating-linear-gradient(135deg,transparent 0 5px,color-mix(in srgb,var(--card) 40%,transparent) 5px 7px)}
+.day.today{box-shadow:inset 0 0 0 2px var(--ink)}
+.day.sel{outline:3px solid var(--hl);outline-offset:1px}
+.day:not(.empty):hover{filter:brightness(1.06)}
+@media(max-width:420px){.day .v{font-size:.64rem}.day{padding:3px 4px}}
+
+/* rows */
+.rows{display:grid}
+.row{display:grid;grid-template-columns:36px minmax(0,1fr) auto;gap:4px 12px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
+.row:first-child{border-top:0}
+.ava{width:36px;height:36px;border-radius:50%;background:var(--paper);object-fit:cover;display:grid;place-items:center;font-weight:700;font-size:.8rem;color:var(--ink-2);overflow:hidden}
+.row .sym{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap} .row .sym a{color:inherit;text-decoration:none} .row .sym a:hover{text-decoration:underline}
+.row .meta{color:var(--muted);font-size:.85rem}
+.pnl{font:700 1.05rem "Bricolage Grotesque",sans-serif;text-align:right;display:flex;align-items:center;gap:6px;justify-content:flex-end}
+.pnl i{width:8px;height:8px;border-radius:2px;display:inline-block;flex:none}
+.pnl.up i{background:var(--up)} .pnl.down i{background:var(--down);transform:rotate(45deg)}
+.pnl small{display:block;font:400 .8rem "Instrument Sans",sans-serif;color:var(--muted)}
+.pill{display:inline-block;font-size:.78rem;font-weight:400;padding:1px 8px;border-radius:99px;border:1px solid var(--line);color:var(--ink-2);margin-left:6px}
+/* stop -> entry -> peak ruler */
+.ruler{grid-column:2/4;height:6px;border-radius:3px;background:var(--paper);position:relative;margin-top:2px}
+.ruler b{position:absolute;top:-3px;width:2px;height:12px;background:var(--ink)}
+.ruler .fill{position:absolute;top:0;bottom:0;border-radius:3px}
+
+/* bars */
+.bars{display:grid;gap:8px}
+.bar{display:grid;grid-template-columns:minmax(0,42%) 1fr auto;gap:10px;align-items:center;font-size:.9rem}
+.bar>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar .track{height:10px;position:relative}
+.bar .track span{position:absolute;top:0;bottom:0;border-radius:0 4px 4px 0;background:var(--ink-2)}
+.bar .track.div span.neg{border-radius:4px 0 0 4px;background:var(--down)}
+.bar .track.div span.pos{background:var(--up)}
+.bar .track.div::before{content:"";position:absolute;left:50%;top:-3px;bottom:-3px;width:1px;background:var(--muted)}
+.bar em{font-style:normal;color:var(--ink-2);min-width:4ch;text-align:right}
+
+.empty-note{color:var(--muted);padding:12px 0}
+.err{margin-top:40px;padding:18px;border:2px solid var(--down);border-radius:6px;background:var(--card);max-width:60ch}
+.err p{margin-top:6px}
+.foot{margin-top:40px;color:var(--muted);font-size:.85rem;max-width:70ch}
+.foot code{background:var(--card);padding:1px 5px;border-radius:4px}
+.clear.more{margin:12px auto 0;display:block;padding:6px 16px;font-size:.9rem}
+.clear{border:1px solid var(--line);background:transparent;border-radius:99px;padding:2px 10px;font-size:.8rem;cursor:pointer;margin-left:auto}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M3 14a13 11 0 0 1 26 0z" fill="currentColor"/><path d="M3 14q3.2-3 6.5 0q3.2-3 6.5 0q3.2-3 6.5 0q3.2-3 6.5 0" fill="var(--paper)"/><path d="M4 14l12 13 12-13M16 14v13" stroke="currentColor" stroke-width="1.4" fill="none"/></svg>
+      Ripcord
+    </div>
+    <span class="mode">paper trading na Solani: pravo tržište, virtuelni novac</span>
+    <div class="live"><span class="dot" id="dot"></span><span id="ago">učitavam…</span></div>
+    <button class="theme" id="theme" aria-label="Promeni temu"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+  </div>
+
+  <main id="app" aria-live="polite"></main>
+
+  <p class="foot">Svaki trejd plaća 1% troška po strani plus proklizavanje iz dubine pula, tako da papirni rezultat nije ulepšan. Bot radi na GitHub Actions i proverava tržište na svakih 20 sekundi. Pravila menjaš u <code>config.json</code>.</p>
+</div>
+
+<script>
+const REPO = 'lukascalezzz-svg/ripcord-bot';
+const SRC = new URLSearchParams(location.search).get('src')
+  || (/^(localhost|127\.)/.test(location.hostname) ? '../data/state.json' : `https://raw.githubusercontent.com/${REPO}/main/data/state.json`);
+const app = document.getElementById('app');
+const $ = (s, el = document) => el.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const usd = (v, sign) => (sign && v > 0 ? '+' : v < 0 ? '−' : '') + '$' + Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const pct = (v) => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(1) + '%';
+const dayKey = (ts) => { const d = new Date(ts); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+const dur = (ms) => { const m = Math.round(ms / 60000); return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`; };
+const REASONS = { 'stop loss': 'stop loss', 'trailing stop': 'trailing stop', 'take profit 1': 'take profit', 'moonshot take profit': 'moonshot', 'dead coin': 'mrtav coin', 'max hold time': 'isteklo vreme', 'liquidity pulled': 'izvučena likvidnost', 'pair vanished (rug)': 'rug', 'copied wallet sold': 'wallet prodao' };
+const REJECTS = { 'no pool liquidity': 'još na pump.fun krivi', 'liquidity too low': 'premala likvidnost', 'liquidity too high': 'prevelika likvidnost', 'mcap too low': 'premali mcap', 'mcap too high': 'preveliki mcap', 'too new': 'premlad', 'too old': 'prestar', 'few buys 5m': 'malo kupovina', 'sellers win 5m': 'prodavci jači (5m)', 'sellers win 1h': 'prodavci jači (1h)', 'no 5m momentum': 'nema zamaha (5m)', 'candle too vertical': 'sveća prestrma', 'no 1h trend': 'nema trenda (1h)', 'already pumped': 'već ispumpan', 'low volume': 'mali volumen', 'low score': 'nizak skor', 'rugcheck risk': 'RugCheck rizik' };
+
+let state = null, selDay = null, drawn = false, showAll = false;
+
+// theme toggle, remembered per browser
+const root = document.documentElement;
+try { const t = localStorage.getItem('rc-theme'); if (t) root.dataset.theme = t; } catch {}
+$('#theme').onclick = () => {
+  const dark = root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+  root.dataset.theme = dark ? 'light' : 'dark';
+  try { localStorage.setItem('rc-theme', root.dataset.theme); } catch {}
+};
+
+async function load() {
+  try {
+    const r = await fetch(SRC + (SRC.includes('?') ? '&' : '?') + 't=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) throw new Error(r.status);
+    state = await r.json();
+    render();
+  } catch (e) {
+    if (!state) app.innerHTML = `<div class="err"><h2>Podaci bota se ne učitavaju</h2><p>Proveri da je repo <b>${esc(REPO)}</b> javan i da je bot odradio bar jedan krug (GitHub, tab Actions, ripcord-bot, Run workflow).</p></div>`;
+    $('#ago').textContent = 'nema veze sa podacima';
+    $('#dot').classList.add('stale');
+  }
+}
+
+function equityNow(s) { return s.cashUsd + s.positions.reduce((a, p) => a + p.qty * (p.lastPrice || p.entryPrice), 0); }
+
+// equity at the end of each local day (last sample of that day)
+function dailyCloses(s) {
+  const m = new Map();
+  for (const [t, v] of s.equity) m.set(dayKey(t), v);
+  return m;
+}
+function dayStartEquity(s, closes, k) {
+  const prev = [...closes.keys()].filter((d) => d < k).sort();
+  return prev.length ? closes.get(prev.at(-1)) : s.startBalanceUsd;
+}
+
+function render() {
+  const s = state, now = Date.now();
+  const eq = equityNow(s);
+  const closes = dailyCloses(s);
+  const today = dayKey(now);
+  const dayStart = dayStartEquity(s, closes, today);
+  const todayPnl = eq - dayStart, todayPct = (todayPnl / dayStart) * 100;
+  const total = eq - s.startBalanceUsd;
+  const closed = s.closed;
+  const wins = closed.filter((t) => t.pnlUsd > 0), losses = closed.filter((t) => t.pnlUsd <= 0);
+  const gw = wins.reduce((a, t) => a + t.pnlUsd, 0), gl = -losses.reduce((a, t) => a + t.pnlUsd, 0);
+  const pf = gl ? (gw / gl).toFixed(2) : wins.length ? '∞' : '–';
+  const todays = closed.filter((t) => dayKey(t.exitTs) === today);
+  const runningDays = Math.max(1, Math.ceil((now - s.startedAt) / 864e5));
+
+  const age = now - s.lastRun;
+  $('#ago').textContent = `poslednja provera pre ${age < 60000 ? Math.round(age / 1000) + ' s' : dur(age)}`;
+  $('#dot').classList.toggle('stale', age > 20 * 60000);
+
+  const byReason = {};
+  for (const t of todays) { const k = REASONS[t.reason] || t.reason; byReason[k] = (byReason[k] || 0) + t.pnlUsd; }
+  const sorted = Object.entries(byReason).sort((a, b) => b[1] - a[1]);
+  let verdict = todays.length
+    ? `Danas ${todayPnl >= 0 ? 'u plusu' : 'u minusu'} kroz ${todays.length} ${todays.length === 1 ? 'zatvoren trejd' : 'zatvorenih trejdova'}, ${s.positions.length} otvoreno.`
+    : s.positions.length ? `Danas još nema zatvorenih trejdova. Otvoreno: ${s.positions.length}.` : 'Danas još nema trejdova. Bot čeka token koji prođe sve filtere.';
+  if (sorted[0]?.[1] > 0) verdict += ` Najviše je donelo „${sorted[0][0]}" (${usd(sorted[0][1], 1)}).`;
+  if (sorted.at(-1)?.[1] < 0) verdict += ` Najviše je koštalo „${sorted.at(-1)[0]}" (${usd(sorted.at(-1)[1], 1)}).`;
+
+  app.innerHTML = `
+  <section class="hero">
+    <span class="label">Danas, ${new Date().toLocaleDateString('sr-Latn', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
+    <div class="big num ${todayPnl >= 0 ? 'up' : 'down'} ${drawn ? 'on' : ''}" id="big"><span class="swipe"></span><span>${usd(todayPnl, 1)}</span><span class="pct">${pct(todayPct)}</span></div>
+    <p class="verdict">${esc(verdict)}</p>
+    <div class="stats">
+      <div class="stat"><b>${usd(eq)}</b><span>kapital (start ${usd(s.startBalanceUsd)})</span></div>
+      <div class="stat"><b>${usd(total, 1)}</b><span>ukupno za ${runningDays} ${runningDays === 1 ? 'dan' : 'dana'}</span></div>
+      <div class="stat"><b>${closed.length ? Math.round((wins.length / closed.length) * 100) + '%' : '–'}</b><span>pogođenih od ${closed.length}</span></div>
+      <div class="stat"><b>${pf}</b><span>profit faktor (dobit / gubitak)</span></div>
+      <div class="stat"><b>${wins.length ? usd(gw / wins.length) : '–'} / ${losses.length ? usd(-gl / losses.length) : '–'}</b><span>prosečan dobitak / gubitak</span></div>
+    </div>
+  </section>
+
+  <section class="sheet">
+    <header><h2>Kapital</h2><p>isprekidana linija je start od ${usd(s.startBalanceUsd)}</p></header>
+    <div class="chart" id="chart"></div>
+  </section>
+
+  <div class="grid2">
+    <section class="sheet">
+      <header><h2>Dani</h2><p>dodirni dan za njegove trejdove</p></header>
+      <div class="days" id="days"></div>
+    </section>
+    <section class="sheet">
+      <header><h2>Otvorene pozicije</h2><p>traka ide od stopa do vrha, crtica je ulaz</p></header>
+      <div class="rows" id="open"></div>
+    </section>
+  </div>
+
+  <section class="sheet">
+    <header><h2 id="logt">Zatvoreni trejdovi</h2><button class="clear" id="clear" hidden>prikaži sve</button></header>
+    <div class="rows" id="log"></div>
+  </section>
+
+  <div class="grid2">
+    <section class="sheet">
+      <header><h2>Zašto izlazi</h2><p>dobit po razlogu izlaza</p></header>
+      <div class="bars" id="exits"></div>
+    </section>
+    <section class="sheet">
+      <header><h2>Zašto preskače</h2><p id="skipsub"></p></header>
+      <div class="bars" id="skips"></div>
+    </section>
+  </div>`;
+
+  drawChart(s, eq);
+  drawDays(closes, today, s);
+  drawOpen(s);
+  drawLog();
+  drawExits(selDay ? closed.filter((t) => dayKey(t.exitTs) === selDay) : closed);
+  drawSkips();
+  if (!drawn) requestAnimationFrame(() => requestAnimationFrame(() => $('#big').classList.add('on')));
+  drawn = true;
+}
+
+function drawChart(s, eq) {
+  const el = $('#chart');
+  const pts = [[s.startedAt, s.startBalanceUsd], ...s.equity, [Date.now(), eq]];
+  const W = el.clientWidth, H = el.clientHeight, P = { l: 52, r: 10, t: 10, b: 24 };
+  const ys = pts.map((p) => p[1]);
+  const x0 = pts[0][0], x1 = Math.max(pts.at(-1)[0], x0 + 1);
+  let y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const pad = Math.max((y1 - y0) * 0.15, s.startBalanceUsd * 0.01); y0 -= pad; y1 += pad;
+  const X = (t) => P.l + ((t - x0) / (x1 - x0)) * (W - P.l - P.r);
+  const Y = (v) => P.t + (1 - (v - y0) / (y1 - y0)) * (H - P.t - P.b);
+  const d = pts.map((p, i) => `${i ? 'L' : 'M'}${X(p[0]).toFixed(1)},${Y(p[1]).toFixed(1)}`).join('');
+  const base = Y(s.startBalanceUsd);
+  const ticks = [y0 + pad, (y0 + y1) / 2, y1 - pad];
+  const up = eq >= s.startBalanceUsd;
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Kapital kroz vreme, sada ${usd(eq)}">
+    <defs><clipPath id="above"><rect x="0" y="0" width="${W}" height="${base}"/></clipPath><clipPath id="below"><rect x="0" y="${base}" width="${W}" height="${H}"/></clipPath></defs>
+    <g class="axis">${ticks.map((v) => `<text x="${P.l - 8}" y="${Y(v) + 4}" text-anchor="end">$${Math.round(v)}</text>`).join('')}
+      <text x="${P.l}" y="${H - 4}">${new Date(x0).toLocaleDateString('sr-Latn', { day: 'numeric', month: 'short' })}</text>
+      <text x="${W - P.r}" y="${H - 4}" text-anchor="end">sada</text></g>
+    <path class="eq-area" d="${d}L${X(x1)},${base}L${X(x0)},${base}Z" fill="var(--up-wash)" clip-path="url(#above)"/>
+    <path class="eq-area" d="${d}L${X(x1)},${base}L${X(x0)},${base}Z" fill="var(--down-wash)" clip-path="url(#below)"/>
+    <line class="base" x1="${P.l}" x2="${W - P.r}" y1="${base}" y2="${base}"/>
+    <path class="eq-line" id="eqline" d="${d}"/>
+    <circle cx="${X(x1)}" cy="${Y(eq)}" r="5" fill="${up ? 'var(--up)' : 'var(--down)'}" stroke="var(--card)" stroke-width="2"/>
+    <line class="cross" id="cross" y1="${P.t}" y2="${H - P.b}"/><circle class="knob" id="knob" r="5"/>
+  </svg><div class="tip" id="tip"></div>`;
+  // the one orchestrated moment: the ink line draws itself on first load
+  if (!drawn && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const line = $('#eqline'), len = line.getTotalLength();
+    line.style.strokeDasharray = len; line.style.strokeDashoffset = len;
+    line.getBoundingClientRect();
+    line.style.transition = 'stroke-dashoffset 1.6s cubic-bezier(.4,.1,.2,1)'; line.style.strokeDashoffset = 0;
+  }
+  el.onpointermove = (e) => {
+    const mx = e.clientX - el.getBoundingClientRect().left;
+    let best = pts[0];
+    for (const p of pts) if (Math.abs(X(p[0]) - mx) < Math.abs(X(best[0]) - mx)) best = p;
+    const px = X(best[0]), py = Y(best[1]);
+    $('#cross').setAttribute('x1', px); $('#cross').setAttribute('x2', px);
+    $('#knob').setAttribute('cx', px); $('#knob').setAttribute('cy', py);
+    const tip = $('#tip'); tip.style.left = Math.min(Math.max(px, 90), W - 90) + 'px'; tip.style.top = py + 'px';
+    tip.textContent = `${usd(best[1])}, ${new Date(best[0]).toLocaleString('sr-Latn', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}`;
+    el.classList.add('hover');
+  };
+  el.onpointerleave = () => el.classList.remove('hover');
+}
+
+function drawDays(closes, today, s) {
+  const el = $('#days');
+  const delta = {};
+  for (const k of closes.keys()) delta[k] = closes.get(k) - dayStartEquity(s, closes, k);
+  delta[today] = equityNow(s) - dayStartEquity(s, closes, today);
+  const max = Math.max(1, ...Object.values(delta).map(Math.abs));
+  const cells = [];
+  const end = new Date(); end.setHours(0, 0, 0, 0);
+  const start = new Date(end); start.setDate(start.getDate() - 21); start.setDate(start.getDate() - ((start.getDay() + 6) % 7)); // Monday, ~4 weeks back
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    const k = dayKey(d), v = delta[k];
+    if (v === undefined) { cells.push(`<div class="day empty" aria-hidden="true"><span class="d">${d.getDate()}</span></div>`); continue; }
+    const a = 0.3 + 0.7 * Math.min(Math.abs(v) / max, 1);
+    const bg = Math.abs(v) < 0.01 ? 'var(--flat)' : `color-mix(in srgb, ${v > 0 ? 'var(--up)' : 'var(--down)'} ${Math.round(a * 100)}%, var(--card))`;
+    const txt = Math.abs(v) >= 100 ? Math.round(Math.abs(v)) : Math.abs(v).toFixed(1);
+    cells.push(`<button class="day ${v < 0 ? 'loss' : ''} ${k === today ? 'today' : ''} ${k === selDay ? 'sel' : ''}" data-k="${k}" style="background-color:${bg}" aria-label="${k}: ${usd(v, 1)}" title="${usd(v, 1)}"><span class="d">${d.getDate()}</span><span class="v">${v > 0 ? '+' : v < 0 ? '−' : ''}${txt}</span></button>`);
+  }
+  el.innerHTML = cells.join('');
+  el.onclick = (e) => {
+    const b = e.target.closest('.day[data-k]'); if (!b) return;
+    selDay = selDay === b.dataset.k ? null : b.dataset.k; render();
+    $('#log').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
+  };
+}
+
+function avatar(t) {
+  const ini = esc((t.symbol || '?').slice(0, 2));
+  return t.img ? `<img class="ava" src="${esc(t.img)}" alt="" loading="lazy" onerror="this.outerHTML='<span class=ava>${ini}</span>'">` : `<span class="ava">${ini}</span>`;
+}
+
+function drawOpen(s) {
+  const el = $('#open');
+  if (!s.positions.length) { el.innerHTML = `<p class="empty-note">Nema otvorenih pozicija. Bot ulazi kad token prođe sve filtere i RugCheck.</p>`; return; }
+  el.innerHTML = s.positions.map((p) => {
+    const val = p.qty * p.lastPrice + p.proceedsUsd, pnl = val - p.costUsd, g = (p.lastPrice / p.entryPrice - 1) * 100;
+    const lo = Math.min(p.stop, p.lastPrice), hi = Math.max(p.peak, p.lastPrice, p.entryPrice * 1.01), span = hi - lo || 1;
+    const at = (v) => Math.min(100, Math.max(0, ((v - lo) / span) * 100));
+    return `<div class="row">${avatar(p)}
+      <div style="min-width:0"><div class="sym"><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.symbol)}</a><span class="pill">${p.source === 'copy' ? 'copy' : 'momentum'}</span>${p.tp1Done ? '<span class="pill">pola prodato</span>' : ''}</div>
+      <div class="meta">${dur(Date.now() - p.entryTs)}, uloženo ${usd(p.costUsd)}</div></div>
+      <div class="pnl ${pnl >= 0 ? 'up' : 'down'}"><i></i><div>${usd(pnl, 1)}<small>${pct(g)}</small></div></div>
+      <div class="ruler" title="stop ${p.stop.toPrecision(3)}, ulaz ${p.entryPrice.toPrecision(3)}, vrh ${p.peak.toPrecision(3)}">
+        <span class="fill" style="left:${Math.min(at(p.entryPrice), at(p.lastPrice))}%;width:${Math.abs(at(p.lastPrice) - at(p.entryPrice))}%;background:${g >= 0 ? 'var(--up)' : 'var(--down)'}"></span>
+        <b style="left:${at(p.entryPrice)}%"></b></div>
+    </div>`;
+  }).join('');
+}
+
+function drawLog() {
+  const el = $('#log');
+  const all = (selDay ? state.closed.filter((t) => dayKey(t.exitTs) === selDay) : state.closed).slice().reverse();
+  const list = showAll ? all : all.slice(0, 15);
+  $('#logt').textContent = selDay ? `Trejdovi, ${new Date(selDay + 'T12:00').toLocaleDateString('sr-Latn', { day: 'numeric', month: 'long' })}` : 'Zatvoreni trejdovi';
+  $('#clear').hidden = !selDay; $('#clear').onclick = () => { selDay = null; render(); };
+  if (!list.length) { el.innerHTML = `<p class="empty-note">${selDay ? 'Tog dana nije zatvoren nijedan trejd.' : 'Još nema zatvorenih trejdova. Prvi obično stignu u roku od sat vremena.'}</p>`; return; }
+  el.innerHTML = list.map((t) => `<div class="row">${avatar(t)}
+    <div style="min-width:0"><div class="sym"><a href="${esc(t.url)}" target="_blank" rel="noopener">${esc(t.symbol)}</a><span class="pill">${esc(REASONS[t.reason] || t.reason)}</span></div>
+    <div class="meta">${new Date(t.exitTs).toLocaleString('sr-Latn', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}, držano ${dur(t.exitTs - t.entryTs)}, vrh ${pct(t.peakPct)}</div></div>
+    <div class="pnl ${t.pnlUsd >= 0 ? 'up' : 'down'}"><i></i><div>${usd(t.pnlUsd, 1)}<small>${pct(t.pnlPct)}</small></div></div></div>`).join('')
+    + (all.length > list.length ? `<button class="clear more" id="more">prikaži svih ${all.length}</button>` : '');
+  if ($('#more')) $('#more').onclick = () => { showAll = true; drawLog(); };
+}
+
+function drawExits(list) {
+  const el = $('#exits');
+  const agg = {};
+  for (const t of list) { const k = REASONS[t.reason] || t.reason; (agg[k] ||= { n: 0, v: 0 }); agg[k].n++; agg[k].v += t.pnlUsd; }
+  const rows = Object.entries(agg).sort((a, b) => b[1].v - a[1].v);
+  if (!rows.length) { el.innerHTML = `<p class="empty-note">Pojaviće se posle prvih izlaza.</p>`; return; }
+  const max = Math.max(...rows.map(([, r]) => Math.abs(r.v)), 1);
+  el.innerHTML = rows.map(([k, r]) => {
+    const w = (Math.abs(r.v) / max) * 50;
+    return `<div class="bar" title="${r.n} trejdova"><span>${esc(k)} <span style="color:var(--muted)">×${r.n}</span></span>
+      <div class="track div"><span class="${r.v >= 0 ? 'pos' : 'neg'}" style="${r.v >= 0 ? `left:50%;width:${w}%` : `left:${50 - w}%;width:${w}%`}"></span></div><em>${usd(r.v, 1)}</em></div>`;
+  }).join('');
+}
+
+function drawSkips() {
+  const el = $('#skips');
+  // bot buckets these per UTC day; nearest bucket is fine for tuning
+  const keys = Object.keys(state.days).sort();
+  const want = selDay || dayKey(Date.now());
+  const k = keys.includes(want) ? want : keys.at(-1);
+  const d = k && state.days[k];
+  $('#skipsub').textContent = d ? `${d.scanned} pregledano, ${d.entered} kupljeno (${k})` : 'nema podataka';
+  if (!d) { el.innerHTML = ''; return; }
+  const rows = Object.entries(d.rejects).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  const max = Math.max(...rows.map((r) => r[1]), 1);
+  el.innerHTML = rows.map(([r, n]) => `<div class="bar"><span>${esc(REJECTS[r] || r)}</span><div class="track"><span style="left:0;width:${(n / max) * 100}%"></span></div><em>${n}</em></div>`).join('');
+}
+
+load();
+setInterval(load, 60000);
+let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => state && drawChart(state, equityNow(state)), 120); });
+</script>
+</body>
+</html>
