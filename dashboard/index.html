@@ -153,11 +153,13 @@ button{font:inherit;color:inherit}
 
 <script>
 const REPO = 'lukascalezzz-svg/ripcord-bot';
-const SRC = new URLSearchParams(location.search).get('src')
+const qs = new URLSearchParams(location.search).get('src');
+const SRC = (qs && /^\.{0,2}\/[\w./-]+\.json$/.test(qs) && !qs.startsWith('//') ? qs : null)  // same-origin relative json only
   || (/^(localhost|127\.)/.test(location.hostname) ? '../data/state.json' : `https://raw.githubusercontent.com/${REPO}/main/data/state.json`);
 const app = document.getElementById('app');
 const $ = (s, el = document) => el.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const safeUrl = (u) => (/^https:\/\//i.test(u || "") ? esc(u) : "#");
 const usd = (v, sign) => (sign && v > 0 ? '+' : v < 0 ? '−' : '') + '$' + Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const pct = (v) => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(1) + '%';
 const dayKey = (ts) => { const d = new Date(ts); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
@@ -360,7 +362,7 @@ function drawDays(closes, today, s) {
 
 function avatar(t) {
   const ini = esc((t.symbol || '?').slice(0, 2));
-  return t.img ? `<img class="ava" src="${esc(t.img)}" alt="" loading="lazy" onerror="this.outerHTML='<span class=ava>${ini}</span>'">` : `<span class="ava">${ini}</span>`;
+  return /^https:\/\//i.test(t.img || "") ? `<img class="ava" src="${esc(t.img)}" alt="" loading="lazy" data-ini="${ini}">` : `<span class="ava">${ini}</span>`;
 }
 
 function drawOpen(s) {
@@ -371,7 +373,7 @@ function drawOpen(s) {
     const lo = Math.min(p.stop, p.lastPrice), hi = Math.max(p.peak, p.lastPrice, p.entryPrice * 1.01), span = hi - lo || 1;
     const at = (v) => Math.min(100, Math.max(0, ((v - lo) / span) * 100));
     return `<div class="row">${avatar(p)}
-      <div style="min-width:0"><div class="sym"><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.symbol)}</a><span class="pill">${p.source === 'copy' ? 'copy' : 'momentum'}</span>${p.tp1Done ? '<span class="pill">pola prodato</span>' : ''}</div>
+      <div style="min-width:0"><div class="sym"><a href="${safeUrl(p.url)}" target="_blank" rel="noopener">${esc(p.symbol)}</a><span class="pill">${p.source === 'copy' ? 'copy' : 'momentum'}</span>${p.tp1Done ? '<span class="pill">pola prodato</span>' : ''}</div>
       <div class="meta">${dur(Date.now() - p.entryTs)}, uloženo ${usd(p.costUsd)}</div></div>
       <div class="pnl ${pnl >= 0 ? 'up' : 'down'}"><i></i><div>${usd(pnl, 1)}<small>${pct(g)}</small></div></div>
       <div class="ruler" title="stop ${p.stop.toPrecision(3)}, ulaz ${p.entryPrice.toPrecision(3)}, vrh ${p.peak.toPrecision(3)}">
@@ -389,7 +391,7 @@ function drawLog() {
   $('#clear').hidden = !selDay; $('#clear').onclick = () => { selDay = null; render(); };
   if (!list.length) { el.innerHTML = `<p class="empty-note">${selDay ? 'Tog dana nije zatvoren nijedan trejd.' : 'Još nema zatvorenih trejdova. Prvi obično stignu u roku od sat vremena.'}</p>`; return; }
   el.innerHTML = list.map((t) => `<div class="row">${avatar(t)}
-    <div style="min-width:0"><div class="sym"><a href="${esc(t.url)}" target="_blank" rel="noopener">${esc(t.symbol)}</a><span class="pill">${esc(REASONS[t.reason] || t.reason)}</span></div>
+    <div style="min-width:0"><div class="sym"><a href="${safeUrl(t.url)}" target="_blank" rel="noopener">${esc(t.symbol)}</a><span class="pill">${esc(REASONS[t.reason] || t.reason)}</span></div>
     <div class="meta">${new Date(t.exitTs).toLocaleString('sr-Latn', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}, držano ${dur(t.exitTs - t.entryTs)}, vrh ${pct(t.peakPct)}</div></div>
     <div class="pnl ${t.pnlUsd >= 0 ? 'up' : 'down'}"><i></i><div>${usd(t.pnlUsd, 1)}<small>${pct(t.pnlPct)}</small></div></div></div>`).join('')
     + (all.length > list.length ? `<button class="clear more" id="more">prikaži svih ${all.length}</button>` : '');
@@ -421,9 +423,11 @@ function drawSkips() {
   if (!d) { el.innerHTML = ''; return; }
   const rows = Object.entries(d.rejects).sort((a, b) => b[1] - a[1]).slice(0, 8);
   const max = Math.max(...rows.map((r) => r[1]), 1);
-  el.innerHTML = rows.map(([r, n]) => `<div class="bar"><span>${esc(REJECTS[r] || r)}</span><div class="track"><span style="left:0;width:${(n / max) * 100}%"></span></div><em>${n}</em></div>`).join('');
+  el.innerHTML = rows.map(([r, n]) => `<div class="bar"><span>${esc(REJECTS[r] || r)}</span><div class="track"><span style="left:0;width:${(Number(n) / max) * 100 || 0}%"></span></div><em>${Number(n) || 0}</em></div>`).join('');
 }
 
+// broken token image -> initials (no inline handler: symbols are attacker-chosen)
+addEventListener("error", (e) => { const i = e.target; if (i.tagName === "IMG" && i.dataset.ini !== undefined) { const s = document.createElement("span"); s.className = "ava"; s.textContent = i.dataset.ini; i.replaceWith(s); } }, true);
 load();
 setInterval(load, 60000);
 let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => state && drawChart(state, equityNow(state)), 120); });
