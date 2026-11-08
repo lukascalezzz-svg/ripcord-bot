@@ -71,6 +71,12 @@ test('skeptic vetoes the classic rug setups', () => {
   assert.match(skepticVeto({ ...a, lpLocked: 0 }, good, cfg.skeptic), /LP/);
   assert.match(skepticVeto({ ...a, holders: 40 }, good, cfg.skeptic), /40 holdera/);
   assert.match(skepticVeto(a, { ...good, liquidity: { usd: 5_000 }, marketCap: 1_000_000 }, cfg.skeptic), /tanka/);
+  // DACAT 2026-11-08: top10 19.8% of $100k mcap vs $24k pool, LP burned, rugged in 6 min
+  assert.match(skepticVeto({ ...a, top10: 19.8 }, { ...good, liquidity: { usd: 23_894 }, marketCap: 100_656 }, cfg.skeptic), /isprazni pul/);
+});
+
+test('filter: one-sided bot buying is rejected (DACAT 624 buys vs 79 sells)', () => {
+  assert.equal(entryReject({ ...good, txns: { ...good.txns, m5: { buys: 624, sells: 79 } } }, now, cfg.entry), 'bot buying 5m');
 });
 
 test('finish keeps state small', () => {

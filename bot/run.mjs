@@ -62,6 +62,8 @@ export function entryReject(p, now, e) {
   if (ageMin > e.maxAgeHours * 60) return 'too old';
   if (num(m5.buys) < e.minBuysM5) return 'few buys 5m';
   if (rM5 < e.minBuyRatioM5) return 'sellers win 5m';
+  // 5x+ more buys than sells in 5 min is bundled bot buying before a dump, not real demand
+  if (e.maxBuyRatioM5 && rM5 > e.maxBuyRatioM5) return 'bot buying 5m';
   if (rH1 < e.minBuyRatioH1) return 'sellers win 1h';
   if (chM5 < e.minChangeM5) return 'no 5m momentum';
   if (chM5 > e.maxChangeM5) return 'candle too vertical';
@@ -119,6 +121,9 @@ export function skepticVeto(a, p, s) {
   if (a.creatorTokens > s.maxCreatorTokens) return `dev je već napravio ${a.creatorTokens} tokena`;
   const liq = num(p.liquidity?.usd), mc = num(p.marketCap || p.fdv);
   if (mc && liq / mc < s.minLiqToMcap) return `tanka likvidnost (${((liq / mc) * 100).toFixed(1)}% od mcap)`;
+  // burned LP does not stop a rug: top holders can still sell into the pool and drain it
+  const dump = liq ? (a.top10 / 100) * mc / liq : 0;
+  if (s.maxTop10DumpToLiq && dump > s.maxTop10DumpToLiq) return `top 10 može da isprazni pul (${dump.toFixed(2)}x likvidnosti)`;
   return null;
 }
 

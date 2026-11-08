@@ -18,6 +18,7 @@
     "maxAgeHours": 48,
     "minBuysM5": 25,
     "minBuyRatioM5": 2.5,
+    "maxBuyRatioM5": 4.2,
     "minBuyRatioH1": 1.05,
     "minChangeM5": 1,
     "maxChangeM5": 20,
@@ -34,7 +35,8 @@
     "minHolders": 150,
     "minLpLockedPct": 90,
     "maxCreatorTokens": 5,
-    "minLiqToMcap": 0.03
+    "minLiqToMcap": 0.03,
+    "maxTop10DumpToLiq": 0.5
   },
   "exit": {
     "stopLossPct": -0.18,
@@ -63,6 +65,7 @@
     "_note": "Tracks every bought, vetoed and near-miss token for windowMin to learn if the rules are right (node bot/review.mjs).",
     "baseline": {
       "minBuyRatioM5": 1.2,
+      "maxBuyRatioM5": 0,
       "minScore": 0
     },
     "windowMin": 60,
