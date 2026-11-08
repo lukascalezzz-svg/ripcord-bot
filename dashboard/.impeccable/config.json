@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "marquee",
+        "value": "*",
+        "files": [
+          "dashboard/index.html"
+        ],
+        "createdAt": "2026-11-08T10:41:58.781Z",
+        "reason": "Claude decided: ticker shows live token data the bot is scanning, copied from the user's reference video; pauses on hover and stops under reduced motion"
+      }
+    ]
+  }
+}
