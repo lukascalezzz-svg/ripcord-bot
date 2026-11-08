@@ -29,6 +29,17 @@
     "minScore": 0
   },
 
+  "skeptic": {
+    "_note": "Veto rules. Any hit blocks the trade. Holder % excludes pools and known program accounts.",
+    "maxTop10Pct": 30,
+    "maxSingleHolderPct": 10,
+    "maxInsiders": 5,
+    "minHolders": 150,
+    "minLpLockedPct": 90,
+    "maxCreatorTokens": 5,
+    "minLiqToMcap": 0.03
+  },
+
   "exit": {
     "stopLossPct": -0.18,
     "tp1Pct": 0.4,

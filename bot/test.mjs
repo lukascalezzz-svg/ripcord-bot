@@ -45,3 +45,39 @@ test('exit rules', () => {
 test('fresh state equity = start balance', () => {
   assert.equal(equity(freshState(cfg)), cfg.startBalanceUsd);
 });
+
+import { analyze, skepticVeto, finish } from './run.mjs';
+
+const report = {
+  totalHolders: 900, graphInsidersDetected: 0, creatorTokens: [], mintAuthority: null, freezeAuthority: null,
+  knownAccounts: { POOL: { name: 'Pump AMM', type: 'AMM' } },
+  markets: [{ pubkey: 'MKT', lp: { lpLockedPct: 100 } }],
+  topHolders: [{ owner: 'POOL', address: 'a', pct: 80 }, { owner: 'w1', address: 'b', pct: 4 }, { owner: 'w2', address: 'c', pct: 3 }],
+  risks: [{ name: 'Low Liquidity', level: 'danger' }],
+};
+
+test('analyst ignores the pool and liquidity warnings; skeptic passes a clean token', () => {
+  const a = analyze(report);
+  assert.equal(a.top10, 7);
+  assert.equal(a.topOne, 4);
+  assert.deepEqual(a.dangers, []);
+  assert.equal(skepticVeto(a, good, cfg.skeptic), null);
+});
+
+test('skeptic vetoes the classic rug setups', () => {
+  const a = analyze(report);
+  assert.match(skepticVeto({ ...a, mintAuth: true }, good, cfg.skeptic), /štampa/);
+  assert.match(skepticVeto({ ...a, topOne: 22 }, good, cfg.skeptic), /22%/);
+  assert.match(skepticVeto({ ...a, lpLocked: 0 }, good, cfg.skeptic), /LP/);
+  assert.match(skepticVeto({ ...a, holders: 40 }, good, cfg.skeptic), /40 holdera/);
+  assert.match(skepticVeto(a, { ...good, liquidity: { usd: 5_000 }, marketCap: 1_000_000 }, cfg.skeptic), /tanka/);
+});
+
+test('finish keeps state small', () => {
+  const s = freshState(cfg, now);
+  s.feed = Array.from({ length: 200 }, (_, i) => ({ ts: i }));
+  s.equity = Array.from({ length: 3000 }, (_, i) => [now - (3000 - i) * 60_000, 1000]);
+  finish(s, now);
+  assert.equal(s.feed.length, 80);
+  assert.ok(s.equity.length < 1600, `equity ${s.equity.length}`);
+});

@@ -1,18 +1,16 @@
-// Ripcord: Solana meme coin paper-trading bot.
-// Real live prices (DexScreener), virtual money. One tick = scan + manage positions.
-// LOOP_SECONDS=270 keeps ticking every TICK_SECONDS inside one GitHub Actions run.
-import fs from 'node:fs';
+// Ripcord v2: a desk of six agents, all plain fast code (no LLM in the hot path).
+// Scout finds tokens, Filter checks the numbers, Analyst reads the holder map,
+// Skeptic vetoes, Sniper sizes the entry, Guard manages exits.
+// Runtime-agnostic: Node runs tests/local loops, Supabase (Deno) runs the live desk.
 
-const ROOT = new URL('..', import.meta.url);
-const STATE_FILE = new URL('data/state.json', ROOT);
 const DS = 'https://api.dexscreener.com';
-const RPC = process.env.RPC_URL || 'https://api.mainnet-beta.solana.com';
 const QUOTES = new Set([
   'So11111111111111111111111111111111111111112',
   'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
   'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB',
 ]);
 const MIN = 60_000;
+export const AGENTS = ['scout', 'filter', 'analyst', 'skeptic', 'sniper', 'guard'];
 
 const num = (v) => Number(v) || 0;
 const day = (ts) => new Date(ts).toISOString().slice(0, 10);
@@ -25,8 +23,9 @@ async function get(url, init) {
 
 export function freshState(cfg, now = Date.now()) {
   return {
-    startedAt: now, startBalanceUsd: cfg.startBalanceUsd, cashUsd: cfg.startBalanceUsd,
-    positions: [], closed: [], equity: [], cooldown: {}, rug: {}, walletSigs: {}, days: {}, lastRun: 0,
+    version: 2, startedAt: now, startBalanceUsd: cfg.startBalanceUsd, cashUsd: cfg.startBalanceUsd,
+    positions: [], closed: [], equity: [[now, cfg.startBalanceUsd]], cooldown: {}, rug: {}, walletSigs: {},
+    days: {}, feed: [], ticker: [], radar: [], pulse: {}, lastRun: 0,
   };
 }
 
@@ -42,7 +41,7 @@ export function sellFill(qty, price, liqUsd, fee) {
   return gross * (1 - impact(gross, liqUsd)) * (1 - fee);
 }
 
-// ---------- entry filter: returns null when OK, else the first failing reason ----------
+// ---------- Filter: null when OK, else the first failing reason ----------
 export function entryReject(p, now, e) {
   const liq = num(p.liquidity?.usd);
   const mcap = num(p.marketCap || p.fdv);
@@ -87,7 +86,45 @@ export function features(p, now) {
   };
 }
 
-// ---------- exit logic: pure, so it is testable ----------
+// ---------- Analyst: the facts the Skeptic judges, from a RugCheck report ----------
+export function analyze(r) {
+  // pools, vaults and known programs are not "holders"
+  const skip = new Set(Object.keys(r.knownAccounts || {}));
+  for (const m of r.markets || []) for (const k of [m.pubkey, m.liquidityA, m.liquidityB, m.liquidityAAccount?.pubkey, m.liquidityBAccount?.pubkey]) if (typeof k === 'string') skip.add(k);
+  const holders = (r.topHolders || []).filter((h) => !skip.has(h.owner) && !skip.has(h.address));
+  const top10 = holders.slice(0, 10).reduce((a, h) => a + num(h.pct), 0);
+  const lp = Math.max(0, ...(r.markets || []).map((m) => num(m.lp?.lpLockedPct)));
+  return {
+    holders: num(r.totalHolders), top10: +top10.toFixed(1), topOne: +num(holders[0]?.pct).toFixed(1),
+    insiders: num(r.graphInsidersDetected), lpLocked: Math.round(lp), creatorTokens: (r.creatorTokens || []).length,
+    mintAuth: !!r.mintAuthority, freezeAuth: !!r.freezeAuthority, rugged: !!r.rugged,
+    // low liquidity is the Filter's job, not a rug signal
+    dangers: (r.risks || []).filter((k) => k.level === 'danger' && !/liquidity/i.test(k.name)).map((k) => k.name),
+  };
+}
+
+// ---------- Skeptic: argues against every trade; any hit is a veto (UI copy is Serbian) ----------
+export function skepticVeto(a, p, s) {
+  if (a.rugged) return 'već rugovan';
+  if (a.mintAuth) return 'dev može da štampa nove tokene';
+  if (a.freezeAuth) return 'dev može da zamrzne tuđe wallete';
+  if (a.dangers.length) return `RugCheck: ${a.dangers[0]}`;
+  if (a.topOne > s.maxSingleHolderPct) return `jedan wallet drži ${a.topOne}%`;
+  if (a.top10 > s.maxTop10Pct) return `top 10 holdera drži ${a.top10}%`;
+  if (a.insiders > s.maxInsiders) return `${a.insiders} povezanih insajder walleta`;
+  if (a.holders < s.minHolders) return `samo ${a.holders} holdera`;
+  if (a.lpLocked < s.minLpLockedPct) return `LP zaključan samo ${a.lpLocked}%`;
+  if (a.creatorTokens > s.maxCreatorTokens) return `dev je već napravio ${a.creatorTokens} tokena`;
+  const liq = num(p.liquidity?.usd), mc = num(p.marketCap || p.fdv);
+  if (mc && liq / mc < s.minLiqToMcap) return `tanka likvidnost (${((liq / mc) * 100).toFixed(1)}% od mcap)`;
+  return null;
+}
+
+export function riskOf(a, vetoed) {
+  return Math.min(1, a.top10 / 60 + (a.insiders ? 0.15 : 0) + (a.holders < 300 ? 0.15 : 0) + (a.lpLocked < 90 ? 0.2 : 0) + (vetoed ? 0.3 : 0));
+}
+
+// ---------- Guard: exit logic, pure so it is testable ----------
 export function exitDecision(pos, price, liq, now, x) {
   const gain = price / pos.entryPrice - 1;
   const held = (now - pos.entryTs) / MIN;
@@ -116,36 +153,23 @@ async function discover() {
 // best pool per mint (deepest liquidity, quoted in SOL/USDC/USDT)
 async function pairsFor(mints) {
   const out = new Map();
-  for (let i = 0; i < mints.length; i += 30) {
-    const chunk = mints.slice(i, i + 30);
+  const chunks = [];
+  for (let i = 0; i < mints.length; i += 30) chunks.push(mints.slice(i, i + 30));
+  await Promise.all(chunks.map(async (chunk) => {
     let pairs = [];
-    try { pairs = await get(`${DS}/tokens/v1/solana/${chunk.join(',')}`); } catch (err) { console.warn('pairs', err.message); continue; }
+    try { pairs = await get(`${DS}/tokens/v1/solana/${chunk.join(',')}`); } catch (err) { console.warn('pairs', err.message); return; }
     for (const p of pairs) {
       const mint = p.baseToken?.address;
       if (!chunk.includes(mint) || !QUOTES.has(p.quoteToken?.address)) continue;
       const prev = out.get(mint);
       if (!prev || num(p.liquidity?.usd) > num(prev.liquidity?.usd)) out.set(mint, p);
     }
-  }
+  }));
   return out;
 }
 
-async function rugOk(state, mint, maxScore, now) {
-  const c = state.rug[mint];
-  if (c && now - c.ts < 6 * 60 * MIN) return c.ok;
-  try {
-    const r = await get(`https://api.rugcheck.xyz/v1/tokens/${mint}/report/summary`);
-    const danger = (r.risks || []).some((k) => k.level === 'danger');
-    const ok = !danger && num(r.score_normalised) <= maxScore;
-    state.rug[mint] = { ts: now, ok, score: num(r.score_normalised), risks: (r.risks || []).map((k) => k.name).slice(0, 4) };
-    return ok;
-  } catch {
-    return false; // unknown = unsafe; not cached, retried next tick
-  }
-}
-
-async function rpc(method, params) {
-  const r = await get(RPC, {
+async function rpc(url, method, params) {
+  const r = await get(url, {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
   });
@@ -154,11 +178,11 @@ async function rpc(method, params) {
 }
 
 // copy-trade: net token change of each tracked wallet in its new transactions
-async function walletSignals(state, wallets, now) {
+async function walletSignals(state, wallets, rpcUrl, now) {
   const buys = new Map(), sells = new Set();
   for (const w of wallets) {
     try {
-      const sigs = await rpc('getSignaturesForAddress', [w, { limit: 10 }]);
+      const sigs = await rpc(rpcUrl, 'getSignaturesForAddress', [w, { limit: 10 }]);
       const last = state.walletSigs[w];
       state.walletSigs[w] = sigs[0]?.signature || last;
       if (!last) continue; // first sight: remember, never copy old history
@@ -166,7 +190,7 @@ async function walletSignals(state, wallets, now) {
       for (const s of sigs) { if (s.signature === last) break; if (!s.err) fresh.push(s); }
       for (const s of fresh.slice(0, 5)) {
         if (s.blockTime && now / 1000 - s.blockTime > 180) continue; // older than 3 min = too late to copy
-        const tx = await rpc('getTransaction', [s.signature, { encoding: 'jsonParsed', maxSupportedTransactionVersion: 0 }]);
+        const tx = await rpc(rpcUrl, 'getTransaction', [s.signature, { encoding: 'jsonParsed', maxSupportedTransactionVersion: 0 }]);
         const delta = {};
         for (const b of tx?.meta?.preTokenBalances || []) if (b.owner === w) delta[b.mint] = (delta[b.mint] || 0) - num(b.uiTokenAmount?.uiAmount);
         for (const b of tx?.meta?.postTokenBalances || []) if (b.owner === w) delta[b.mint] = (delta[b.mint] || 0) + num(b.uiTokenAmount?.uiAmount);
@@ -180,117 +204,169 @@ async function walletSignals(state, wallets, now) {
   return { buys, sells };
 }
 
-// ---------- one tick ----------
-export async function tick(state, cfg, now = Date.now()) {
-  const fee = cfg.costs.feePctPerSide;
-  const today = (state.days[day(now)] ||= { scanned: 0, entered: 0, rejects: {} });
-  const { buys, sells } = cfg.copy.wallets.length ? await walletSignals(state, cfg.copy.wallets, now) : { buys: new Map(), sells: new Set() };
+// ---------- desk chat + counters ----------
+function say(state, agent, text, extra = {}) {
+  state.feed.push({ ts: Date.now(), agent, text, ...extra });
+}
+function bump(today, agent, n = 1) {
+  today.agents[agent] = (today.agents[agent] || 0) + n;
+}
+function dayBucket(state, now) {
+  const t = (state.days[day(now)] ||= { scanned: 0, entered: 0, rejects: {} });
+  t.agents ||= {};
+  return t;
+}
 
-  // 1) manage open positions
-  const held = await pairsFor(state.positions.map((p) => p.mint));
-  for (const pos of [...state.positions]) {
-    const p = held.get(pos.mint);
-    if (sells.has(pos.mint)) pos.walletSold = true;
-    if (!p) {
-      if (++pos.missing >= cfg.exit.missingTicks) closePos(state, pos, 0, 'pair vanished (rug)', now, cfg);
-      continue;
-    }
-    pos.missing = 0;
-    const price = num(p.priceUsd), liq = num(p.liquidity?.usd);
-    pos.lastPrice = price; pos.lastLiq = liq;
-    if (price > pos.peak) pos.peak = price;
-    if (pos.tp1Done) pos.stop = Math.max(pos.stop, pos.peak * (1 - cfg.exit.trailPct));
-    const d = exitDecision(pos, price, liq, now, cfg.exit);
-    if (d.act === 'close') closePos(state, pos, sellFill(pos.qty, price, liq, fee), d.why, now, cfg);
-    else if (d.act === 'partial') {
-      const q = pos.qty * cfg.exit.tp1SellFraction;
-      const got = sellFill(q, price, liq, fee);
-      pos.qty -= q; pos.proceedsUsd += got; state.cashUsd += got;
-      pos.tp1Done = true; pos.stop = Math.max(pos.entryPrice, pos.peak * (1 - cfg.exit.trailPct)); // never give back the win
-      pos.events.push({ ts: now, what: d.why, price, usd: +got.toFixed(2) });
+// ---------- one tick of the desk ----------
+export async function tick(state, cfg, now = Date.now(), env = {}) {
+  const fee = cfg.costs.feePctPerSide;
+  const today = dayBucket(state, now);
+  const mark = (a) => { state.pulse[a] = now; };
+  const { buys, sells } = cfg.copy.wallets.length && env.rpcUrl
+    ? await walletSignals(state, cfg.copy.wallets, env.rpcUrl, now) : { buys: new Map(), sells: new Set() };
+
+  // Guard first: open positions are the money at risk
+  if (state.positions.length) {
+    mark('guard');
+    const held = await pairsFor(state.positions.map((p) => p.mint));
+    for (const pos of [...state.positions]) {
+      const p = held.get(pos.mint);
+      if (sells.has(pos.mint)) pos.walletSold = true;
+      if (!p) {
+        if (++pos.missing >= cfg.exit.missingTicks) closePos(state, pos, 0, 'pair vanished (rug)', now, cfg, today);
+        continue;
+      }
+      pos.missing = 0;
+      const price = num(p.priceUsd), liq = num(p.liquidity?.usd);
+      pos.lastPrice = price; pos.lastLiq = liq;
+      if (price > pos.peak) pos.peak = price;
+      if (pos.tp1Done) pos.stop = Math.max(pos.stop, pos.peak * (1 - cfg.exit.trailPct));
+      const d = exitDecision(pos, price, liq, now, cfg.exit);
+      if (d.act === 'close') closePos(state, pos, sellFill(pos.qty, price, liq, fee), d.why, now, cfg, today);
+      else if (d.act === 'partial') {
+        const q = pos.qty * cfg.exit.tp1SellFraction;
+        const got = sellFill(q, price, liq, fee);
+        pos.qty -= q; pos.proceedsUsd += got; state.cashUsd += got;
+        pos.tp1Done = true; pos.stop = Math.max(pos.entryPrice, pos.peak * (1 - cfg.exit.trailPct)); // never give back the win
+        pos.events.push({ ts: now, what: d.why, price, usd: +got.toFixed(2) });
+        bump(today, 'guard');
+        say(state, 'guard', `${pos.symbol}: prodao pola na +${((price / pos.entryPrice - 1) * 100).toFixed(0)}%, stop podignut na ulaz`, { mint: pos.mint, tone: 'up' });
+      }
     }
   }
 
-  // 2) find entries
+  // Scout
+  mark('scout');
   const heldSet = new Set(state.positions.map((p) => p.mint));
-  const mints = [...new Set([...(await discover()), ...buys.keys()])]
-    .filter((m) => !heldSet.has(m) && !(state.cooldown[m] > now));
+  const found = await discover();
+  const mints = [...new Set([...found, ...buys.keys()])].filter((m) => !heldSet.has(m) && !(state.cooldown[m] > now));
   const pairs = await pairsFor(mints);
+  bump(today, 'scout', pairs.size);
+  today.scanned += pairs.size;
+  const live = [...pairs.values()].filter((p) => num(p.liquidity?.usd) > 0).sort((a, b) => num(b.volume?.h1) - num(a.volume?.h1)).slice(0, 14);
+  if (live.length) state.ticker = live.map((p) => ({ s: p.baseToken.symbol, ch: num(p.priceChange?.m5), mc: Math.round(num(p.marketCap || p.fdv)) }));
+
+  // Filter
   const picks = [];
   for (const [mint, p] of pairs) {
-    today.scanned++;
     const copied = buys.has(mint);
     const e = copied ? { ...cfg.entry, ...cfg.copy.relaxedEntry } : cfg.entry;
     const why = entryReject(p, now, e);
     if (why) { today.rejects[why] = (today.rejects[why] || 0) + 1; continue; }
     picks.push({ mint, p, copied, s: score(p) + (copied ? 10 : 0) });
   }
+  if (picks.length) { mark('filter'); bump(today, 'filter', picks.length); }
   picks.sort((a, b) => b.s - a.s);
+
+  // Analyst -> Skeptic -> Sniper, best candidates first, only while there is room
   for (const { mint, p, copied } of picks) {
     if (state.positions.length >= cfg.maxOpen) break;
-    if (!(await rugOk(state, mint, cfg.entry.maxRugScore, now))) { today.rejects['rugcheck risk'] = (today.rejects['rugcheck risk'] || 0) + 1; continue; }
+    const sym = p.baseToken.symbol;
+    let c = state.rug[mint];
+    if (!c || now - c.ts > 30 * MIN) {
+      mark('analyst');
+      try {
+        const a = analyze(await get(`https://api.rugcheck.xyz/v1/tokens/${mint}/report`));
+        const veto = skepticVeto(a, p, cfg.skeptic);
+        c = state.rug[mint] = { ts: now, a, veto };
+        bump(today, 'analyst');
+        say(state, 'analyst', `${sym}: ${a.holders} holdera, top 10 drži ${a.top10}%, LP ${a.lpLocked}% zaključan`, { mint });
+        state.radar.push({ mint, s: sym, risk: +riskOf(a, !!veto).toFixed(2), ok: !veto, ts: now });
+      } catch {
+        continue; // unknown = unsafe; retried next tick
+      }
+    }
+    mark('skeptic');
+    if (c.veto) {
+      bump(today, 'blocked');
+      today.rejects['skeptic veto'] = (today.rejects['skeptic veto'] || 0) + 1;
+      state.cooldown[mint] = now + 30 * MIN; // do not re-argue the same token every tick
+      say(state, 'skeptic', `${sym}: blokiram. ${c.veto}.`, { mint, tone: 'down', veto: true });
+      continue;
+    }
+    bump(today, 'skeptic');
+    say(state, 'skeptic', `${sym}: nemam primedbu.`, { mint });
+
+    mark('sniper');
     const usd = Math.min(state.cashUsd, equity(state) * (copied ? cfg.copyPositionPct : cfg.positionPct));
     if (usd < 5) break;
     const price = num(p.priceUsd), liq = num(p.liquidity?.usd);
     const qty = buyFill(usd, price, liq, fee);
     state.cashUsd -= usd;
     state.positions.push({
-      mint, symbol: p.baseToken.symbol, name: p.baseToken.name, url: p.url, img: p.info?.imageUrl || '',
+      mint, symbol: sym, name: p.baseToken.name, url: p.url, img: p.info?.imageUrl || '',
       source: copied ? 'copy' : 'momentum', wallet: copied ? buys.get(mint) : undefined,
       entryTs: now, entryPrice: price, costUsd: usd, qty, proceedsUsd: 0,
       peak: price, stop: price * (1 + cfg.exit.stopLossPct), tp1Done: false,
       entryLiq: liq, lastPrice: price, lastLiq: liq, missing: 0,
-      features: features(p, now), events: [{ ts: now, what: 'buy', price, usd: +usd.toFixed(2) }],
+      features: features(p, now), analysis: c.a, events: [{ ts: now, what: 'buy', price, usd: +usd.toFixed(2) }],
     });
     today.entered++;
-    console.log(`BUY ${p.baseToken.symbol} $${usd.toFixed(0)} @ ${price} (${copied ? 'copy' : 'momentum'})`);
+    bump(today, 'sniper');
+    say(state, 'sniper', `${sym}: kupljeno $${usd.toFixed(0)}, stop ${(cfg.exit.stopLossPct * 100).toFixed(0)}%`, { mint, tone: 'up' });
   }
   state.lastRun = now;
 }
 
-function closePos(state, pos, proceeds, why, now, cfg) {
+function closePos(state, pos, proceeds, why, now, cfg, today) {
   state.cashUsd += proceeds;
   const total = pos.proceedsUsd + proceeds;
   state.positions = state.positions.filter((p) => p !== pos);
   state.cooldown[pos.mint] = now + cfg.cooldownMin * MIN;
+  const pnl = total - pos.costUsd, pct = (total / pos.costUsd - 1) * 100;
   state.closed.push({
     mint: pos.mint, symbol: pos.symbol, name: pos.name, url: pos.url, img: pos.img, source: pos.source,
     entryTs: pos.entryTs, exitTs: now, entryPrice: pos.entryPrice, exitPrice: pos.lastPrice,
     costUsd: +pos.costUsd.toFixed(2), proceedsUsd: +total.toFixed(2),
-    pnlUsd: +(total - pos.costUsd).toFixed(2), pnlPct: +((total / pos.costUsd - 1) * 100).toFixed(1),
-    peakPct: +((pos.peak / pos.entryPrice - 1) * 100).toFixed(1), reason: why, features: pos.features,
+    pnlUsd: +pnl.toFixed(2), pnlPct: +pct.toFixed(1),
+    peakPct: +((pos.peak / pos.entryPrice - 1) * 100).toFixed(1), reason: why, features: pos.features, analysis: pos.analysis,
   });
-  console.log(`SELL ${pos.symbol} ${why} pnl $${(total - pos.costUsd).toFixed(2)}`);
+  if (today) bump(today, 'guard');
+  say(state, 'guard', `${pos.symbol}: izlaz (${why}), ${pnl >= 0 ? '+' : '−'}$${Math.abs(pnl).toFixed(2)}`, { mint: pos.mint, tone: pnl >= 0 ? 'up' : 'down' });
 }
 
 export function equity(state) {
   return state.cashUsd + state.positions.reduce((s, p) => s + p.qty * (p.lastPrice || p.entryPrice), 0);
 }
 
-function prune(state, now) {
+// keep the state small enough to poll from a phone
+export function finish(state, now = Date.now()) {
+  const last = state.equity.at(-1);
+  if (!last || now - last[0] >= MIN) state.equity.push([now, +equity(state).toFixed(2)]);
+  else last[1] = +equity(state).toFixed(2);
+  const thin = [];
+  for (const pt of state.equity) {
+    const prev = thin.at(-1);
+    if (now - pt[0] > 24 * 60 * MIN && prev && Math.floor(prev[0] / (15 * MIN)) === Math.floor(pt[0] / (15 * MIN))) { thin[thin.length - 1] = pt; continue; }
+    thin.push(pt);
+  }
+  state.equity = thin.filter(([t]) => now - t < 30 * 24 * 60 * MIN);
   for (const [m, t] of Object.entries(state.cooldown)) if (t < now) delete state.cooldown[m];
-  for (const [m, c] of Object.entries(state.rug)) if (now - c.ts > 24 * 60 * MIN) delete state.rug[m];
-  state.equity = state.equity.filter(([t]) => now - t < 30 * 24 * 60 * MIN);
+  for (const [m, c] of Object.entries(state.rug)) if (now - c.ts > 2 * 60 * MIN) delete state.rug[m];
+  state.feed = state.feed.slice(-80);
+  state.radar = state.radar.slice(-24);
+  state.closed = state.closed.slice(-500);
   const keep = Object.keys(state.days).sort().slice(-30);
   state.days = Object.fromEntries(keep.map((k) => [k, state.days[k]]));
-}
-
-// ---------- main ----------
-if (import.meta.url === `file://${process.argv[1]}`) {
-  const cfg = JSON.parse(fs.readFileSync(new URL('config.json', ROOT)));
-  const state = fs.existsSync(STATE_FILE) ? JSON.parse(fs.readFileSync(STATE_FILE)) : freshState(cfg);
-  const loopMs = num(process.env.LOOP_SECONDS) * 1000, tickMs = (num(process.env.TICK_SECONDS) || 20) * 1000;
-  const until = Date.now() + loopMs;
-  do {
-    const t0 = Date.now();
-    try { await tick(state, cfg, t0); } catch (err) { console.error('tick failed', err.message); }
-    prune(state, Date.now());
-    fs.writeFileSync(STATE_FILE, JSON.stringify(state));
-    const wait = tickMs - (Date.now() - t0);
-    if (Date.now() + wait < until) await new Promise((r) => setTimeout(r, Math.max(wait, 0)));
-    else break;
-  } while (true);
-  state.equity.push([Date.now(), +equity(state).toFixed(2)]);
-  fs.writeFileSync(STATE_FILE, JSON.stringify(state));
-  console.log(`equity $${equity(state).toFixed(2)} | open ${state.positions.length} | closed ${state.closed.length}`);
+  return state;
 }

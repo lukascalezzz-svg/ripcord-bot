@@ -1,36 +1,20 @@
-name: ripcord-bot
+name: tests
+# The live desk runs on Supabase (pg_cron every 15 s -> edge function ripcord-tick).
+# GitHub only checks the agent logic on every push.
 on:
-  schedule:
-    - cron: '*/5 * * * *'
+  push:
   workflow_dispatch:
 
-concurrency:
-  group: ripcord-bot
-  cancel-in-progress: false
-
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  tick:
+  test:
     runs-on: ubuntu-latest
-    timeout-minutes: 9
+    timeout-minutes: 3
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
       - run: node --test bot/test.mjs
-      # one run = ~4.5 min of ticks every 20 s, so the bot is live between cron fires
-      - run: node bot/run.mjs
-        env:
-          LOOP_SECONDS: 270
-          TICK_SECONDS: 20
-          RPC_URL: ${{ secrets.RPC_URL }}
-      - name: save state
-        run: |
-          git config user.name "ripcord-bot"
-          git config user.email "ripcord-bot@users.noreply.github.com"
-          git add data/state.json
-          git commit -q -m "tick $(date -u +%FT%TZ) [skip ci]" || exit 0
-          for i in 1 2 3; do git pull -q --rebase && git push -q && break; sleep 5; done

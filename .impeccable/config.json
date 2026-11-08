@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "pulsing-dot",
+        "value": "*",
+        "files": [
+          "dashboard/index.html"
+        ],
+        "createdAt": "2026-11-07T00:27:42.647Z",
+        "reason": "Claude decided: dot is bound to bot lastRun freshness, pulses only while data is under 20 min old, turns static red when stale"
+      }
+    ]
+  }
+}
