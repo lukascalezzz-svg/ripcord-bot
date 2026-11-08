@@ -11,6 +11,24 @@
         ],
         "createdAt": "2026-11-07T00:27:42.647Z",
         "reason": "Claude decided: dot is bound to bot lastRun freshness, pulses only while data is under 20 min old, turns static red when stale"
+      },
+      {
+        "rule": "clipped-overflow-container",
+        "value": "*",
+        "files": [
+          "dashboard/index.html"
+        ],
+        "createdAt": "2026-11-08T16:19:04.234Z",
+        "reason": "Checked: only .tip is a floating layer and it sits in .chart, which has no overflow clip; clipped boxes (.tile,.ava,.day,.ticker) hold no popovers"
+      },
+      {
+        "rule": "dark-glow",
+        "value": "*",
+        "files": [
+          "dashboard/index.html"
+        ],
+        "createdAt": "2026-11-08T16:19:15.769Z",
+        "reason": "Vault Saveti/Lukin ukus i navike + Motion stil za reklame: user's chosen look is dark UI with one brand color (#FF7A1A) as glow"
       }
     ]
   }

@@ -15,15 +15,19 @@ async function rest(path: string, init: RequestInit = {}) {
 Deno.serve(async (req) => {
   const [{ cron_key }] = await rest('rc_private?select=cron_key');
   if (req.headers.get('x-cron-key') !== cron_key) return new Response('forbidden', { status: 403 });
-  if (!(await rest('rpc/rc_try_lock', { method: 'POST', body: JSON.stringify({ secs: 60 }) }))) return new Response('busy');
+  // lock outlives the slowest tick (edge wall clock is 150 s)
+  if (!(await rest('rpc/rc_try_lock', { method: 'POST', body: JSON.stringify({ secs: 160 }) }))) return new Response('busy');
   try {
-    const [row] = await rest('rc_state?select=state,config&id=eq.1');
+    const [row] = await rest('rc_state?select=state,config,updated_at&id=eq.1');
     const cfg = row.config;
-    const state = row.state?.version === 2 ? row.state : freshState(cfg);
+    const state = row.state?.version === 3 ? row.state : freshState(cfg);
     const t0 = Date.now();
     try { await tick(state, cfg, t0, { rpcUrl: Deno.env.get('RPC_URL') }); } catch (e) { console.error('tick', (e as Error).message); state.lastError = { ts: t0, msg: (e as Error).message }; }
     finish(state);
-    await rest('rc_state?id=eq.1', { method: 'PATCH', body: JSON.stringify({ state, updated_at: new Date().toISOString() }) });
+    // only write over the row we read: if anything else wrote meanwhile, drop this tick instead of erasing trades
+    await rest(`rc_state?id=eq.1&updated_at=eq.${encodeURIComponent(row.updated_at)}`, {
+      method: 'PATCH', body: JSON.stringify({ state, updated_at: new Date().toISOString() }),
+    });
     return new Response(`ok ${Date.now() - t0}ms`);
   } finally {
     await rest('rpc/rc_unlock', { method: 'POST', body: '{}' });

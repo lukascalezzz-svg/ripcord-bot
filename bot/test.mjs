@@ -18,8 +18,8 @@ test('thin pool punishes size', () => {
 
 const good = {
   liquidity: { usd: 60_000 }, marketCap: 400_000, pairCreatedAt: now - 120 * 60_000,
-  txns: { m5: { buys: 60, sells: 30 }, h1: { buys: 500, sells: 300 } },
-  priceChange: { m5: 6, h1: 40 }, volume: { h1: 90_000 },
+  txns: { m5: { buys: 120, sells: 30 }, h1: { buys: 500, sells: 300 } },
+  priceChange: { m5: 6, h1: 40 }, volume: { h1: 90_000 }, priceUsd: '0.001',
 };
 
 test('entry: healthy momentum passes, bad setups get a reason', () => {
@@ -80,4 +80,82 @@ test('finish keeps state small', () => {
   finish(s, now);
   assert.equal(s.feed.length, 80);
   assert.ok(s.equity.length < 1600, `equity ${s.equity.length}`);
+});
+
+// ---------- tick() money flow with a fake DexScreener / RugCheck ----------
+import { tick, checkRun } from './run.mjs';
+
+const MINT = 'TokenMint1111111111111111111111111111111pump';
+const SOL = 'So11111111111111111111111111111111111111112';
+const clean = { ...report, risks: [] };
+function market(price, { down = false } = {}) {
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (down && u.includes('/tokens/v1/')) return { ok: false, status: 503, json: async () => ({}) };
+    let body = [];
+    if (u.includes('token-profiles')) body = [{ chainId: 'solana', tokenAddress: MINT }];
+    else if (u.includes('/tokens/v1/')) body = [{ ...good, pairCreatedAt: now - 120 * 60_000, priceUsd: String(price), baseToken: { address: MINT, symbol: 'TST', name: 'Test' }, quoteToken: { address: SOL } }];
+    else if (u.includes('rugcheck')) body = clean;
+    return { ok: true, status: 200, json: async () => body };
+  };
+}
+const c20 = { ...cfg, maxOpen: 1 };
+
+test('tick: buys with $20 desk, outage does not close, take profit then trail', async () => {
+  const s = freshState(c20, now);
+  market(0.001);
+  await tick(s, c20, now);
+  assert.equal(s.positions.length, 1, 'bought');
+  const pos = s.positions[0];
+  assert.ok(Math.abs(pos.costUsd - 6) < 0.01, `30% of $20, got ${pos.costUsd}`);
+  assert.ok(Math.abs(s.cashUsd - 14) < 0.01);
+  assert.equal(s.shadow[0].why, 'kupljeno');
+
+  market(0.001, { down: true });
+  for (let i = 0; i < 15; i++) await tick(s, c20, now + (i + 1) * 15_000);
+  assert.equal(s.positions.length, 1, 'DexScreener outage must not write the position off');
+  assert.equal(pos.missing, 0);
+
+  market(0.0015);
+  await tick(s, c20, now + 5 * 60_000);
+  assert.ok(pos.tp1Done, 'sold half at +50%');
+  assert.ok(pos.stop >= pos.entryPrice, 'stop moved to break-even or better');
+
+  market(0.0011);
+  await tick(s, c20, now + 6 * 60_000);
+  assert.equal(s.positions.length, 0);
+  const t = s.closed.at(-1);
+  assert.equal(t.reason, 'trailing stop');
+  assert.ok(t.pnlUsd > 0, `half at +50% then exit above entry is a win, got ${t.pnlUsd}`);
+  assert.equal(t.run, 1);
+  assert.equal(s.shadow[0].first, 'win');
+});
+
+test('tick: zero price never buys', async () => {
+  const s = freshState(c20, now);
+  market(0);
+  await tick(s, c20, now);
+  assert.equal(s.positions.length, 0);
+});
+
+test('runs: bust restarts at $20, goal cashes out and restarts', () => {
+  const s = freshState(cfg, now);
+  s.cashUsd = 1.2;
+  assert.equal(checkRun(s, cfg, now), 'bust');
+  assert.equal(s.run.n, 2);
+  assert.equal(s.cashUsd, 20);
+  assert.equal(s.runs[0].result, 'bust');
+
+  s.cashUsd = 10;
+  s.positions.push({ mint: MINT, symbol: 'TST', qty: 1000, lastPrice: 0.2, lastLiq: 1e6, costUsd: 10, proceedsUsd: 0, entryPrice: 0.01, peak: 0.2, entryTs: now });
+  assert.equal(checkRun(s, cfg, now + 1), 'cilj');
+  assert.equal(s.positions.length, 0);
+  assert.ok(s.runs[1].endUsd >= 150, `cashed out ${s.runs[1].endUsd}`);
+  assert.equal(s.run.n, 3);
+  assert.equal(s.cashUsd, 20);
+});
+
+test('fixed network cost makes tiny trades honest', () => {
+  const back = sellFill(buyFill(2, 1, 1e6, 0.0125, 0.05), 1, 1e6, 0.0125, 0.05);
+  assert.ok(back < 1.86 && back > 1.84, `$2 round trip should cost ~7.5%, got ${back}`);
 });

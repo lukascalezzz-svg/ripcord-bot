@@ -1,4 +1,5 @@
-// Ripcord v2: a desk of six agents, all plain fast code (no LLM in the hot path).
+// Ripcord v3: a desk of six agents, all plain fast code (no LLM in the hot path).
+// v3: $20 runs with a $150 goal, shadow book that grades every decision, outage-safe Guard.
 // Scout finds tokens, Filter checks the numbers, Analyst reads the holder map,
 // Skeptic vetoes, Sniper sizes the entry, Guard manages exits.
 // Runtime-agnostic: Node runs tests/local loops, Supabase (Deno) runs the live desk.
@@ -10,8 +11,6 @@ const QUOTES = new Set([
   'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB',
 ]);
 const MIN = 60_000;
-export const AGENTS = ['scout', 'filter', 'analyst', 'skeptic', 'sniper', 'guard'];
-
 const num = (v) => Number(v) || 0;
 const day = (ts) => new Date(ts).toISOString().slice(0, 10);
 
@@ -23,22 +22,24 @@ async function get(url, init) {
 
 export function freshState(cfg, now = Date.now()) {
   return {
-    version: 2, startedAt: now, startBalanceUsd: cfg.startBalanceUsd, cashUsd: cfg.startBalanceUsd,
+    version: 3, startedAt: now, startBalanceUsd: cfg.startBalanceUsd, cashUsd: cfg.startBalanceUsd,
     positions: [], closed: [], equity: [[now, cfg.startBalanceUsd]], cooldown: {}, rug: {}, walletSigs: {},
     days: {}, feed: [], ticker: [], radar: [], pulse: {}, lastRun: 0,
+    run: { n: 1, startUsd: cfg.startBalanceUsd, goalUsd: cfg.goalUsd, startedAt: now, peakUsd: cfg.startBalanceUsd },
+    runs: [], shadow: [],
   };
 }
 
-// ---------- fill model: % fee per side + constant-product price impact ----------
+// ---------- fill model: % fee per side + fixed network/priority cost + constant-product price impact ----------
 export function impact(usd, liqUsd) {
   return Math.min(0.5, (2 * usd) / Math.max(liqUsd, 1));
 }
-export function buyFill(usd, price, liqUsd, fee) {
-  return (usd * (1 - fee)) / (price * (1 + impact(usd, liqUsd)));
+export function buyFill(usd, price, liqUsd, fee, fixed = 0) {
+  return (Math.max(usd - fixed, 0) * (1 - fee)) / (price * (1 + impact(usd, liqUsd)));
 }
-export function sellFill(qty, price, liqUsd, fee) {
+export function sellFill(qty, price, liqUsd, fee, fixed = 0) {
   const gross = qty * price;
-  return gross * (1 - impact(gross, liqUsd)) * (1 - fee);
+  return Math.max(gross * (1 - impact(gross, liqUsd)) * (1 - fee) - fixed, 0);
 }
 
 // ---------- Filter: null when OK, else the first failing reason ----------
@@ -52,6 +53,7 @@ export function entryReject(p, now, e) {
   const chM5 = num(p.priceChange?.m5), chH1 = num(p.priceChange?.h1);
   const volLiq = num(p.volume?.h1) / Math.max(liq, 1);
   if (!liq) return 'no pool liquidity';
+  if (!(num(p.priceUsd) > 0)) return 'no price';
   if (liq < e.minLiquidityUsd) return 'liquidity too low';
   if (liq > e.maxLiquidityUsd) return 'liquidity too high';
   if (mcap < e.minMcapUsd) return 'mcap too low';
@@ -150,14 +152,15 @@ async function discover() {
   return [...mints];
 }
 
-// best pool per mint (deepest liquidity, quoted in SOL/USDC/USDT)
+// best pool per mint (deepest liquidity, quoted in SOL/USDC/USDT).
+// out.failed = some chunk errored, so a missing mint means "unknown", not "rugged".
 async function pairsFor(mints) {
   const out = new Map();
   const chunks = [];
   for (let i = 0; i < mints.length; i += 30) chunks.push(mints.slice(i, i + 30));
   await Promise.all(chunks.map(async (chunk) => {
     let pairs = [];
-    try { pairs = await get(`${DS}/tokens/v1/solana/${chunk.join(',')}`); } catch (err) { console.warn('pairs', err.message); return; }
+    try { pairs = await get(`${DS}/tokens/v1/solana/${chunk.join(',')}`); } catch (err) { console.warn('pairs', err.message); out.failed = true; return; }
     for (const p of pairs) {
       const mint = p.baseToken?.address;
       if (!chunk.includes(mint) || !QUOTES.has(p.quoteToken?.address)) continue;
@@ -219,33 +222,37 @@ function dayBucket(state, now) {
 
 // ---------- one tick of the desk ----------
 export async function tick(state, cfg, now = Date.now(), env = {}) {
-  const fee = cfg.costs.feePctPerSide;
+  const fee = cfg.costs.feePctPerSide, fixed = cfg.costs.fixedUsdPerSide || 0;
   const today = dayBucket(state, now);
   const mark = (a) => { state.pulse[a] = now; };
+  state.shadow ||= [];
   const { buys, sells } = cfg.copy.wallets.length && env.rpcUrl
     ? await walletSignals(state, cfg.copy.wallets, env.rpcUrl, now) : { buys: new Map(), sells: new Set() };
 
-  // Guard first: open positions are the money at risk
-  if (state.positions.length) {
-    mark('guard');
-    const held = await pairsFor(state.positions.map((p) => p.mint));
+  // Guard first: open positions are the money at risk. Shadow book rides the same request.
+  const watching = state.shadow.filter((s) => !s.done);
+  if (state.positions.length || watching.length) {
+    if (state.positions.length) mark('guard');
+    const held = await pairsFor([...new Set([...state.positions.map((p) => p.mint), ...watching.map((s) => s.mint)])]);
+    trackShadow(watching, held, now, cfg);
     for (const pos of [...state.positions]) {
       const p = held.get(pos.mint);
       if (sells.has(pos.mint)) pos.walletSold = true;
-      if (!p) {
-        if (++pos.missing >= cfg.exit.missingTicks) closePos(state, pos, 0, 'pair vanished (rug)', now, cfg, today);
+      const price = num(p?.priceUsd), liq = num(p?.liquidity?.usd);
+      if (!p || !(price > 0)) {
+        // a DexScreener outage is not a rug: only count misses when the request itself worked
+        if (!held.failed && ++pos.missing >= cfg.exit.missingTicks) closePos(state, pos, 0, 'pair vanished (rug)', now, cfg, today);
         continue;
       }
       pos.missing = 0;
-      const price = num(p.priceUsd), liq = num(p.liquidity?.usd);
       pos.lastPrice = price; pos.lastLiq = liq;
       if (price > pos.peak) pos.peak = price;
       if (pos.tp1Done) pos.stop = Math.max(pos.stop, pos.peak * (1 - cfg.exit.trailPct));
       const d = exitDecision(pos, price, liq, now, cfg.exit);
-      if (d.act === 'close') closePos(state, pos, sellFill(pos.qty, price, liq, fee), d.why, now, cfg, today);
+      if (d.act === 'close') closePos(state, pos, sellFill(pos.qty, price, liq, fee, fixed), d.why, now, cfg, today);
       else if (d.act === 'partial') {
         const q = pos.qty * cfg.exit.tp1SellFraction;
-        const got = sellFill(q, price, liq, fee);
+        const got = sellFill(q, price, liq, fee, fixed);
         pos.qty -= q; pos.proceedsUsd += got; state.cashUsd += got;
         pos.tp1Done = true; pos.stop = Math.max(pos.entryPrice, pos.peak * (1 - cfg.exit.trailPct)); // never give back the win
         pos.events.push({ ts: now, what: d.why, price, usd: +got.toFixed(2) });
@@ -254,6 +261,8 @@ export async function tick(state, cfg, now = Date.now(), env = {}) {
       }
     }
   }
+
+  checkRun(state, cfg, now, today);
 
   // Scout
   mark('scout');
@@ -272,7 +281,12 @@ export async function tick(state, cfg, now = Date.now(), env = {}) {
     const copied = buys.has(mint);
     const e = copied ? { ...cfg.entry, ...cfg.copy.relaxedEntry } : cfg.entry;
     const why = entryReject(p, now, e);
-    if (why) { today.rejects[why] = (today.rejects[why] || 0) + 1; continue; }
+    if (why) {
+      today.rejects[why] = (today.rejects[why] || 0) + 1;
+      // near miss: would the old, looser rules have bought it? Track it to see if tightening was right.
+      if (cfg.shadow && !entryReject(p, now, { ...e, ...cfg.shadow.baseline })) shadowAdd(state, p, `filter: ${why}`, now, cfg);
+      continue;
+    }
     picks.push({ mint, p, copied, s: score(p) + (copied ? 10 : 0) });
   }
   if (picks.length) { mark('filter'); bump(today, 'filter', picks.length); }
@@ -280,7 +294,7 @@ export async function tick(state, cfg, now = Date.now(), env = {}) {
 
   // Analyst -> Skeptic -> Sniper, best candidates first, only while there is room
   for (const { mint, p, copied } of picks) {
-    if (state.positions.length >= cfg.maxOpen) break;
+    if (state.positions.length >= cfg.maxOpen) { shadowAdd(state, p, 'nema mesta', now, cfg); continue; }
     const sym = p.baseToken.symbol;
     let c = state.rug[mint];
     if (!c || now - c.ts > 30 * MIN) {
@@ -301,6 +315,7 @@ export async function tick(state, cfg, now = Date.now(), env = {}) {
       bump(today, 'blocked');
       today.rejects['skeptic veto'] = (today.rejects['skeptic veto'] || 0) + 1;
       state.cooldown[mint] = now + 30 * MIN; // do not re-argue the same token every tick
+      shadowAdd(state, p, `veto: ${c.veto.replace(/[\d.]+/g, 'N')}`, now, cfg);
       say(state, 'skeptic', `${sym}: blokiram. ${c.veto}.`, { mint, tone: 'down', veto: true });
       continue;
     }
@@ -308,10 +323,12 @@ export async function tick(state, cfg, now = Date.now(), env = {}) {
     say(state, 'skeptic', `${sym}: nemam primedbu.`, { mint });
 
     mark('sniper');
-    const usd = Math.min(state.cashUsd, equity(state) * (copied ? cfg.copyPositionPct : cfg.positionPct));
-    if (usd < 5) break;
+    const minUsd = cfg.minTradeUsd || 5;
+    const usd = Math.min(state.cashUsd, Math.max(minUsd, equity(state) * (copied ? cfg.copyPositionPct : cfg.positionPct)));
+    if (usd < minUsd) { shadowAdd(state, p, 'nema keša', now, cfg); break; }
     const price = num(p.priceUsd), liq = num(p.liquidity?.usd);
-    const qty = buyFill(usd, price, liq, fee);
+    const qty = buyFill(usd, price, liq, fee, fixed);
+    shadowAdd(state, p, 'kupljeno', now, cfg);
     state.cashUsd -= usd;
     state.positions.push({
       mint, symbol: sym, name: p.baseToken.name, url: p.url, img: p.info?.imageUrl || '',
@@ -323,7 +340,7 @@ export async function tick(state, cfg, now = Date.now(), env = {}) {
     });
     today.entered++;
     bump(today, 'sniper');
-    say(state, 'sniper', `${sym}: kupljeno $${usd.toFixed(0)}, stop ${(cfg.exit.stopLossPct * 100).toFixed(0)}%`, { mint, tone: 'up' });
+    say(state, 'sniper', `${sym}: kupljeno $${usd.toFixed(2)}, stop ${(cfg.exit.stopLossPct * 100).toFixed(0)}%`, { mint, tone: 'up' });
   }
   state.lastRun = now;
 }
@@ -340,9 +357,61 @@ function closePos(state, pos, proceeds, why, now, cfg, today) {
     costUsd: +pos.costUsd.toFixed(2), proceedsUsd: +total.toFixed(2),
     pnlUsd: +pnl.toFixed(2), pnlPct: +pct.toFixed(1),
     peakPct: +((pos.peak / pos.entryPrice - 1) * 100).toFixed(1), reason: why, features: pos.features, analysis: pos.analysis,
+    run: state.run?.n,
   });
   if (today) bump(today, 'guard');
   say(state, 'guard', `${pos.symbol}: izlaz (${why}), ${pnl >= 0 ? '+' : '−'}$${Math.abs(pnl).toFixed(2)}`, { mint: pos.mint, tone: pnl >= 0 ? 'up' : 'down' });
+}
+
+// ---------- runs: start small, hit the goal or bust, then start again and learn ----------
+export function checkRun(state, cfg, now, today) {
+  const r = state.run;
+  if (!r) return null;
+  const eq = equity(state);
+  let result = null;
+  if (eq >= r.goalUsd) {
+    // cash out at the goal: a target only counts once it is sold
+    for (const pos of [...state.positions]) closePos(state, pos, sellFill(pos.qty, pos.lastPrice, pos.lastLiq, cfg.costs.feePctPerSide, cfg.costs.fixedUsdPerSide || 0), 'cilj: isplata', now, cfg, today);
+    result = 'cilj';
+  } else if (!state.positions.length && state.cashUsd < (cfg.minTradeUsd || 5)) result = 'bust';
+  if (!result) return null;
+  const mine = state.closed.filter((t) => t.run === r.n);
+  state.runs.push({
+    n: r.n, result, startUsd: r.startUsd, endUsd: +state.cashUsd.toFixed(2), peakUsd: +Math.max(r.peakUsd, state.cashUsd).toFixed(2),
+    trades: mine.length, wins: mine.filter((t) => t.pnlUsd > 0).length, startedAt: r.startedAt, endedAt: now,
+  });
+  say(state, 'guard', result === 'cilj'
+    ? `Run #${r.n}: CILJ! $${r.startUsd} → $${state.cashUsd.toFixed(2)}. Novi run od $${cfg.startBalanceUsd}.`
+    : `Run #${r.n} izgubljen ($${state.cashUsd.toFixed(2)} ostalo). Učimo iz grešaka, novi run od $${cfg.startBalanceUsd}.`, { tone: result === 'cilj' ? 'up' : 'down' });
+  state.run = { n: r.n + 1, startUsd: cfg.startBalanceUsd, goalUsd: cfg.goalUsd, startedAt: now, peakUsd: cfg.startBalanceUsd };
+  state.cashUsd = cfg.startBalanceUsd;
+  state.startBalanceUsd = cfg.startBalanceUsd;
+  state.startedAt = now;
+  state.equity = [[now, cfg.startBalanceUsd]];
+  return result;
+}
+
+// ---------- shadow book: what happened to every token we bought, vetoed or nearly bought ----------
+function shadowAdd(state, p, why, now, cfg) {
+  const sh = cfg.shadow;
+  const mint = p.baseToken?.address, p0 = num(p.priceUsd);
+  if (!sh || !(p0 > 0) || state.shadow.some((s) => s.mint === mint && !s.done)) return;
+  if (state.shadow.filter((s) => !s.done).length >= sh.maxOpen) return;
+  state.shadow.push({ mint, s: p.baseToken.symbol, why, ts: now, p0, hi: p0, lo: p0, last: p0, first: null, done: false, f: features(p, now) });
+}
+
+// first touch decides: did it reach our take-profit before our stop?
+export function trackShadow(list, held, now, cfg) {
+  for (const s of list) {
+    const price = num(held.get(s.mint)?.priceUsd);
+    if (price > 0) {
+      s.last = price; s.hi = Math.max(s.hi, price); s.lo = Math.min(s.lo, price);
+      const g = price / s.p0 - 1;
+      if (!s.first && g >= cfg.exit.tp1Pct) s.first = 'win';
+      if (!s.first && g <= cfg.exit.stopLossPct) s.first = 'loss';
+    }
+    if (now - s.ts >= cfg.shadow.windowMin * MIN) s.done = true;
+  }
 }
 
 export function equity(state) {
@@ -366,6 +435,9 @@ export function finish(state, now = Date.now()) {
   state.feed = state.feed.slice(-80);
   state.radar = state.radar.slice(-24);
   state.closed = state.closed.slice(-500);
+  if (state.run) state.run.peakUsd = +Math.max(state.run.peakUsd, equity(state)).toFixed(2);
+  if (state.shadow) state.shadow = state.shadow.slice(-400);
+  if (state.runs) state.runs = state.runs.slice(-100);
   const keep = Object.keys(state.days).sort().slice(-30);
   state.days = Object.fromEntries(keep.map((k) => [k, state.days[k]]));
   return state;

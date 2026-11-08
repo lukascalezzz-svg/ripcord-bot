@@ -1,15 +1,14 @@
 {
-  "startBalanceUsd": 1000,
-  "positionPct": 0.1,
-  "copyPositionPct": 0.15,
-  "maxOpen": 5,
+  "startBalanceUsd": 20,
+  "positionPct": 0.3,
+  "copyPositionPct": 0.3,
+  "maxOpen": 3,
   "cooldownMin": 120,
-
   "costs": {
-    "feePctPerSide": 0.01,
-    "_note": "1% per side = DEX fee + priority fee + Jito tip; price impact is added on top from pool liquidity"
+    "feePctPerSide": 0.0125,
+    "fixedUsdPerSide": 0.05,
+    "_note": "1.25% per side = DEX/router fee; $0.05 per side = network + priority + Jito tip (real at $20 size); price impact added from pool liquidity"
   },
-
   "entry": {
     "minLiquidityUsd": 20000,
     "maxLiquidityUsd": 3000000,
@@ -18,17 +17,15 @@
     "minAgeMin": 15,
     "maxAgeHours": 48,
     "minBuysM5": 25,
-    "minBuyRatioM5": 1.2,
+    "minBuyRatioM5": 2.5,
     "minBuyRatioH1": 1.05,
     "minChangeM5": 1,
     "maxChangeM5": 20,
     "minChangeH1": 5,
     "maxChangeH1": 400,
     "minVolLiqH1": 0.3,
-    "maxRugScore": 40,
-    "minScore": 0
+    "minScore": 6
   },
-
   "skeptic": {
     "_note": "Veto rules. Any hit blocks the trade. Holder % excludes pools and known program accounts.",
     "maxTop10Pct": 30,
@@ -39,7 +36,6 @@
     "maxCreatorTokens": 5,
     "minLiqToMcap": 0.03
   },
-
   "exit": {
     "stopLossPct": -0.18,
     "tp1Pct": 0.4,
@@ -52,7 +48,6 @@
     "liqDropPct": 0.5,
     "missingTicks": 10
   },
-
   "copy": {
     "_note": "Add Solana wallet addresses of traders you want to copy (find them on gmgn.ai / birdeye / cielo leaderboards).",
     "wallets": [],
@@ -61,5 +56,16 @@
       "minChangeM5": -5,
       "minBuyRatioM5": 1
     }
+  },
+  "goalUsd": 150,
+  "minTradeUsd": 2,
+  "shadow": {
+    "_note": "Tracks every bought, vetoed and near-miss token for windowMin to learn if the rules are right (node bot/review.mjs).",
+    "baseline": {
+      "minBuyRatioM5": 1.2,
+      "minScore": 0
+    },
+    "windowMin": 60,
+    "maxOpen": 40
   }
 }
