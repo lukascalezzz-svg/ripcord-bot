@@ -302,7 +302,7 @@ const ago = (ts) => { const s = Math.max(0, Math.round((Date.now() - ts) / 1000)
 const held = (ms) => { const m = Math.round(ms / 60000); return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`; };
 const dayKey = (ts) => new Date(ts).toISOString().slice(0, 10); // bot buckets days in UTC
 
-let S = null, cold = { equity: [], closed: [] }, booted = false, seenFeed = 0, updatedAt = 0;
+let S = null, cold = { equity: [], closed: [] }, booted = false, seenFeed = 0, updatedAt = 0, chatAt = 0;
 
 async function fetchJSON(select) {
   if (FILE) return (await fetch(FILE + '?t=' + Date.now(), { cache: 'no-store' })).json();
@@ -611,6 +611,8 @@ function drawChat() {
   const el = $('#chat'), F = (S.feed || []).slice(-40).reverse();
   if (!F.length) { el.innerHTML = '<p class="empty">Agenti još ćute. Prvi glas je Analyst, kad Filter pusti token.</p>'; return; }
   const newest = Math.max(...F.map((f) => f.ts));
+  if (newest === seenFeed && Date.now() - chatAt < 30000) return; // keep the reader's scroll position
+  chatAt = Date.now();
   el.innerHTML = F.map((f) => {
     const a = AGM[f.agent] || AG[0];
     const fresh = booted && seenFeed && f.ts > seenFeed;
