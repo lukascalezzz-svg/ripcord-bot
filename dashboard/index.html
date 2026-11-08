@@ -87,7 +87,7 @@ a{color:inherit}
 .goal-top b{font:800 1.05rem "Bricolage Grotesque",sans-serif;color:var(--ink)}
 .goal-top .x{margin-left:auto;color:var(--brand);font-weight:600}
 .goal-track{position:relative;height:10px;margin:10px 0 4px;border-radius:99px;background:var(--line)}
-.goal-fill{position:absolute;inset:0 auto 0 0;border-radius:99px;background:linear-gradient(90deg,#B4511A,var(--brand));box-shadow:0 0 14px rgba(255,122,26,.55);transition:width 1s cubic-bezier(.2,.8,.2,1)}
+.goal-fill{position:absolute;inset:0;border-radius:99px;background:linear-gradient(90deg,#B4511A,var(--brand));box-shadow:0 0 14px rgba(255,122,26,.55);transform:scaleX(0);transform-origin:left;transition:transform 1s cubic-bezier(.2,.8,.2,1)}
 .goal-start{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--ink-2);border-radius:2px}
 .goal-scale{display:flex;justify-content:space-between;font-size:.72rem;color:var(--muted)}
 .goal-runs{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
@@ -411,7 +411,7 @@ function drawGoal(eq) {
   $('#goalrun').textContent = `Run #${r.n}`;
   $('#goaltext').textContent = `${usd(n(r.startUsd))} → cilj ${usd(goal)} · vrh ${usd(n(r.peakUsd))}`;
   $('#goalx').textContent = eq >= goal ? 'cilj!' : `još ${(goal / Math.max(eq, 0.01)).toFixed(1)}x`;
-  $('#goalfill').style.width = w(eq);
+  $('#goalfill').style.transform = `scaleX(${Math.max(0, Math.min(1, eq / goal)).toFixed(4)})`;
   $('#goalstart').style.left = w(n(r.startUsd));
   $('#goalmax').textContent = usd(goal);
   const bar = $('#goalbar'); bar.setAttribute('aria-valuemax', goal); bar.setAttribute('aria-valuenow', eq.toFixed(2));
