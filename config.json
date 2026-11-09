@@ -21,11 +21,14 @@
     "maxBuyRatioM5": 4.2,
     "minBuyRatioH1": 1.05,
     "minChangeM5": 1,
-    "maxChangeM5": 20,
+    "maxChangeM5": 10,
     "minChangeH1": 5,
     "maxChangeH1": 400,
     "minVolLiqH1": 0.3,
-    "minScore": 6
+    "minScore": 6,
+    "confirmMin": 2,
+    "confirmMinGain": 0,
+    "confirmMaxGain": 0.3
   },
   "skeptic": {
     "_note": "Veto rules. Any hit blocks the trade. Holder % excludes pools and known program accounts.",
@@ -40,8 +43,8 @@
   },
   "exit": {
     "stopLossPct": -0.18,
-    "tp1Pct": 0.4,
-    "tp1SellFraction": 0.5,
+    "tp1Pct": 0.3,
+    "tp1SellFraction": 0.75,
     "trailPct": 0.25,
     "hardTpPct": 3,
     "staleMin": 90,
@@ -66,9 +69,86 @@
     "baseline": {
       "minBuyRatioM5": 1.2,
       "maxBuyRatioM5": 0,
-      "minScore": 0
+      "minScore": 0,
+      "maxChangeM5": 20
     },
     "windowMin": 60,
     "maxOpen": 40
+  },
+  "live": {
+    "_note": "Real money mirrors paper only while on=true AND the gate is open: gateTrades closed paper trades since gateFrom, in profit, profit factor >= gatePf. capUsd = most real money in play at once.",
+    "on": false,
+    "capUsd": 20,
+    "gateFrom": 1794260119536,
+    "gateTrades": 50,
+    "gatePf": 1.2
+  },
+  "label": "Zamah",
+  "about": "Kupuje zamah kupaca, ali tek na drugi pogled posle 2 min.",
+  "lab": {
+    "_note": "Challenger tactics. Each overlays entry/exit on the house rules and trades its own $20 paper book. All are hypotheses until the board says otherwise. config.live.follow = a key here makes real money copy that bot instead of the house desk.",
+    "talas": {
+      "label": "Drugi talas",
+      "about": "Token je već pumpao pa pao; kupuje kad se kupci vrate posle prvog dumpa.",
+      "entry": {
+        "minAgeMin": 60,
+        "maxAgeHours": 72,
+        "minChangeH6": 50,
+        "minChangeH1": -45,
+        "maxChangeH1": -8,
+        "minChangeM5": 2,
+        "maxChangeM5": 15,
+        "minBuyRatioM5": 1.6,
+        "minBuyRatioH1": 0.6,
+        "minLiquidityUsd": 30000,
+        "minVolLiqH1": 0.5,
+        "minScore": 0
+      },
+      "exit": {
+        "stopLossPct": -0.15,
+        "tp1Pct": 0.25
+      }
+    },
+    "maturant": {
+      "label": "Maturant",
+      "about": "Tek prešao sa pump.fun krive na pravi pul (3 do 30 min star) i kupci ne staju.",
+      "entry": {
+        "minAgeMin": 3,
+        "maxAgeHours": 0.5,
+        "minBuysM5": 60,
+        "minBuyRatioM5": 1.8,
+        "minChangeH1": 0,
+        "maxChangeH1": 1000,
+        "minScore": 4,
+        "confirmMin": 1
+      },
+      "exit": {
+        "stopLossPct": -0.2,
+        "tp1Pct": 0.35,
+        "staleMin": 30
+      }
+    },
+    "veteran": {
+      "label": "Veteran",
+      "about": "Preživeo bar 6 h, dubok pul, miran rast. Manji dobici, manje rugova.",
+      "entry": {
+        "minAgeMin": 360,
+        "maxAgeHours": 168,
+        "minLiquidityUsd": 80000,
+        "minMcapUsd": 500000,
+        "minBuysM5": 40,
+        "minBuyRatioM5": 1.8,
+        "minChangeM5": 1,
+        "maxChangeM5": 8,
+        "minChangeH1": 3,
+        "maxChangeH1": 60,
+        "minScore": 3
+      },
+      "exit": {
+        "stopLossPct": -0.12,
+        "tp1Pct": 0.2,
+        "trailPct": 0.15
+      }
+    }
   }
 }

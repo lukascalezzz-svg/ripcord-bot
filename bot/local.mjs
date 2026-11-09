@@ -1,6 +1,6 @@
 // Local runner: same desk as Supabase, state in data/state.json. LOOP_SECONDS=60 node bot/local.mjs
 import fs from 'node:fs';
-import { tick, freshState, finish, equity } from './run.mjs';
+import { runAll, freshState, finish, equity } from './run.mjs';
 
 const ROOT = new URL('..', import.meta.url);
 const FILE = new URL(process.env.STATE_FILE || 'data/local-state.json', ROOT);
@@ -11,7 +11,7 @@ const every = (Number(process.env.TICK_SECONDS) || 15) * 1000;
 
 do {
   const t0 = Date.now();
-  try { await tick(state, cfg, t0, { rpcUrl: process.env.RPC_URL }); } catch (err) { console.error('tick failed', err.message); }
+  try { await runAll(state, cfg, t0, { rpcUrl: process.env.RPC_URL }); } catch (err) { console.error('tick failed', err.message); }
   fs.writeFileSync(FILE, JSON.stringify(finish(state)));
   for (const f of state.feed.filter((f) => f.ts >= t0)) console.log(`[${f.agent}] ${f.text}`);
   const wait = every - (Date.now() - t0);

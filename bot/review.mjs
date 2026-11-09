@@ -33,6 +33,12 @@ for (const x of done) { const k = x.why; (g[k] ||= { n: 0, win: 0, loss: 0, hi: 
 for (const [k, v] of Object.entries(g).sort((a, b) => b[1].n - a[1].n)) {
   console.log(`  ${k.slice(0, 40).padEnd(40)} ${String(v.n).padStart(3)}x  win ${v.win}  loss ${v.loss}  prosečan vrh +${((v.hi / v.n) * 100).toFixed(0)}%`);
 }
+// which source finds better tokens: paid DexScreener lists ("boost") or organic GeckoTerminal trending ("trend")
+const src = {};
+for (const x of done) { const k = x.f?.src || 'boost'; (src[k] ||= { n: 0, win: 0, loss: 0 }); src[k].n++; if (x.first === 'win') src[k].win++; if (x.first === 'loss') src[k].loss++; }
+console.log('  po izvoru: ' + Object.entries(src).map(([k, v]) => `${k} ${v.n}x win ${v.win} loss ${v.loss}`).join(' · '));
+const lg = s.live?.gate;
+if (lg) console.log(`\nKAPIJA ZA PRAVI NOVAC: ${lg.trades}/${lg.need} trejdova, ${$(lg.pnlUsd)}, profit faktor ${lg.pf} (treba ${lg.minPf}) → ${lg.ok ? 'OTVORENA' : 'zaključana'}`);
 const missed = done.filter((x) => x.why !== 'kupljeno' && x.first === 'win');
 if (missed.length) console.log(`  propušteni pobednici: ${missed.slice(-8).map((x) => `${x.s} (${x.why}, vrh ${pct(x.hi, x.p0)})`).join(', ')}`);
 console.log('\nPravilo: pravilo koje blokira više pobednika nego gubitnika se labavi; filter "kupljeno" sa više loss nego win se steže.\n');

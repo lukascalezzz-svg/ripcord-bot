@@ -89,7 +89,7 @@ a{color:inherit}
 .goal-track{position:relative;height:10px;margin:10px 0 4px;border-radius:99px;background:var(--line)}
 .goal-fill{position:absolute;inset:0;border-radius:99px;background:linear-gradient(90deg,#B4511A,var(--brand));box-shadow:0 0 14px rgba(255,122,26,.55);transform:scaleX(0);transform-origin:left;transition:transform 1s cubic-bezier(.2,.8,.2,1)}
 .goal-start{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--ink-2);border-radius:2px}
-.goal-scale{display:flex;justify-content:space-between;font-size:.72rem;color:var(--muted)}
+.goal-scale{display:flex;justify-content:space-between;font-size:.74rem;color:var(--muted)}
 .goal-runs{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
 .goal-runs span{font-size:.74rem;padding:3px 8px;border-radius:99px;font-weight:600}
 .goal-runs .bust{background:var(--down-soft);color:#FF9A8C}
@@ -136,7 +136,7 @@ a{color:inherit}
 .agent .nm{font-weight:600}
 .agent .role{color:var(--muted);font-size:.74rem;line-height:1.25}
 .agent .cnt{font:700 1.45rem "Bricolage Grotesque",sans-serif;letter-spacing:-.02em}
-.agent .cnt small{font:500 .72rem "Schibsted Grotesk";color:var(--muted);margin-left:4px;letter-spacing:0}
+.agent .cnt small{font:500 .74rem "Schibsted Grotesk";color:var(--muted);margin-left:4px;letter-spacing:0}
 .agent .say{font-size:.76rem;color:var(--ink-2);min-height:2.5em;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .agent .bars{display:flex;gap:2px;align-items:flex-end;height:14px;position:absolute;right:12px;top:14px}
 .agent .bars i{width:3px;background:var(--c);border-radius:1px;opacity:.35;height:30%}
@@ -150,7 +150,7 @@ a{color:inherit}
 .rows{display:grid}
 .row{display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:3px 10px;align-items:center;padding:9px 0;border-top:1px solid var(--line)}
 .row:first-child{border-top:0}
-.ava{width:30px;height:30px;border-radius:50%;background:var(--card-2);object-fit:cover;display:grid;place-items:center;font-size:.7rem;font-weight:600;color:var(--ink-2);overflow:hidden}
+.ava{width:30px;height:30px;border-radius:50%;background:var(--card-2);object-fit:cover;display:grid;place-items:center;font-size:.74rem;font-weight:600;color:var(--ink-2);overflow:hidden}
 .sym{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sym a{text-decoration:none} .sym a:hover{text-decoration:underline}
 .meta{color:var(--muted);font-size:.76rem}
@@ -161,7 +161,7 @@ a{color:inherit}
 .ruler{grid-column:2/4;height:4px;border-radius:2px;background:var(--line);position:relative}
 .ruler span{position:absolute;top:0;bottom:0;border-radius:2px}
 .ruler b{position:absolute;top:-3px;width:2px;height:10px;background:var(--ink)}
-.tag{display:inline-block;font-size:.7rem;padding:0 7px;border-radius:99px;border:1px solid var(--line-2);color:var(--ink-2);margin-left:6px;font-weight:500;vertical-align:1px}
+.tag{display:inline-block;font-size:.74rem;padding:0 7px;border-radius:99px;border:1px solid var(--line-2);color:var(--ink-2);margin-left:6px;font-weight:500;vertical-align:1px}
 
 /* treemap */
 .tree{position:relative;height:250px}
@@ -179,16 +179,16 @@ a{color:inherit}
 .msg .face::before{left:7px} .msg .face::after{right:7px}
 .bubble{background:var(--card-2);border:1px solid var(--line);border-radius:4px 10px 10px 10px;padding:7px 10px;font-size:.84rem;position:relative}
 .bubble .who{font-weight:600;font-size:.74rem;margin-right:6px}
-.bubble time{color:var(--muted);font-size:.7rem}
+.bubble time{color:var(--muted);font-size:.74rem}
 .msg.veto .bubble{border-color:rgba(236,97,80,.45);background:linear-gradient(180deg,rgba(236,97,80,.10),var(--card-2))}
-.stamp{position:absolute;right:8px;top:50%;font:800 .7rem "Bricolage Grotesque",sans-serif;letter-spacing:.06em;color:var(--down);border:2px solid var(--down);border-radius:5px;padding:1px 6px;transform:translateY(-50%) rotate(-8deg);opacity:.85}
+.stamp{position:absolute;right:8px;top:50%;font:800 .74rem "Bricolage Grotesque",sans-serif;letter-spacing:.06em;color:var(--down);border:2px solid var(--down);border-radius:5px;padding:1px 6px;transform:translateY(-50%) rotate(-8deg);opacity:.85}
 .msg.new.veto .stamp{animation:stamp .45s cubic-bezier(.3,1.6,.5,1)}
 @keyframes stamp{from{transform:translateY(-50%) rotate(-20deg) scale(2.2);opacity:0}}
 .msg.veto .bubble{padding-right:96px}
 
 /* tuning */
 .days{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
-.day{aspect-ratio:1;border:0;border-radius:6px;background:var(--card-2);font-size:.7rem;padding:4px;display:flex;flex-direction:column;justify-content:space-between;text-align:left;color:var(--ink);min-width:0;overflow:hidden}
+.day{aspect-ratio:1;border:0;border-radius:6px;background:var(--card-2);font-size:.74rem;padding:4px;display:flex;flex-direction:column;justify-content:space-between;text-align:left;color:var(--ink);min-width:0;overflow:hidden}
 .day .d{color:var(--muted)} .day .v{font-weight:600}
 .day.e{background:transparent;outline:1px dashed var(--line);outline-offset:-1px}
 .day.l{background-image:repeating-linear-gradient(135deg,transparent 0 5px,rgba(0,0,0,.18) 5px 7px)}
@@ -206,6 +206,56 @@ a{color:inherit}
 .err{max-width:560px;margin:60px auto;padding:20px;border:1px solid var(--down);border-radius:var(--r);background:var(--card)}
 .err p{color:var(--ink-2);margin-top:6px}
 .foot{color:var(--muted);font-size:.78rem;margin-top:22px;max-width:80ch}
+
+/* real money: locked behind three safety pins, stopped by the ripcord */
+.lv{margin-top:14px}
+.lv-grid{display:grid;gap:20px}
+@media(min-width:1000px){.lv-grid{grid-template-columns:minmax(0,1.1fr) minmax(0,1.2fr) minmax(0,1fr);gap:28px}}
+.lv-state{font:800 1.5rem/1.1 "Bricolage Grotesque",sans-serif;letter-spacing:-.02em;text-wrap:balance}
+.lv-state.on{color:var(--brand)}
+.lv-why{color:var(--ink-2);font-size:.86rem;margin-top:6px;max-width:46ch}
+.lv-pins{list-style:none;padding:0;display:grid;gap:10px;margin-top:16px}
+.lv-pin{display:grid;grid-template-columns:40px minmax(0,1fr) auto;gap:12px;align-items:center;font-size:.84rem;color:var(--ink-2)}
+.lv-pin i{height:4px;border-radius:99px;background:var(--line-2);position:relative;margin-left:12px;transition:background .5s,transform .6s cubic-bezier(.3,1.5,.5,1)}
+.lv-pin i::before{content:"";position:absolute;left:-13px;top:-5px;width:14px;height:14px;border-radius:50%;border:3px solid var(--line-2);box-sizing:border-box;transition:border-color .5s}
+.lv-pin.ok i{background:var(--up);transform:translateX(-6px)}
+.lv-pin.ok i::before{border-color:var(--up)}
+.lv-pin b{font:700 .92rem "Bricolage Grotesque",sans-serif;color:var(--ink)}
+.lv h3{font:600 .8rem "Schibsted Grotesk",sans-serif;color:var(--muted);margin-bottom:8px}
+.lv-addr{display:flex;gap:8px;align-items:stretch;flex-wrap:wrap}
+.lv-addr code{flex:1 1 220px;font:500 .8rem ui-monospace,SFMono-Regular,Menlo,monospace;overflow-wrap:anywhere;background:var(--bg-2);border:1px solid var(--line);padding:9px 11px;border-radius:10px;color:var(--ink)}
+.lv-bal{font:800 2rem/1 "Bricolage Grotesque",sans-serif;letter-spacing:-.03em;margin-top:14px}
+.lv-bal small{font:500 .85rem "Schibsted Grotesk",sans-serif;color:var(--muted);letter-spacing:0;margin-left:8px}
+.lv-hint{color:var(--muted);font-size:.8rem;margin-top:8px;max-width:50ch}
+.lv-form{display:grid;gap:10px;align-content:start}
+.lv-form label{display:grid;gap:4px;font-size:.78rem;color:var(--muted)}
+.lv-form input{font:inherit;color:var(--ink);background:var(--bg-2);border:1px solid var(--line-2);border-radius:10px;padding:9px 11px;min-width:0;width:100%}
+.btn{border:1px solid var(--line-2);background:var(--card-2);border-radius:10px;padding:9px 14px;font-weight:600;cursor:pointer;transition:border-color .15s,transform .1s,opacity .2s}
+.btn:hover:not(:disabled){border-color:var(--ink-2)}
+.btn:active:not(:disabled){transform:scale(.98)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.go{background:var(--brand);border-color:var(--brand);color:#1A0E03}
+.btn.rip{background:var(--down);border-color:var(--down);color:#2A0A05}
+.lv-msg{font-size:.82rem;min-height:1.3em;color:var(--ink-2)}
+.lv-msg.bad{color:#FF9A8C} .lv-msg.good{color:#5FE0AE}
+
+/* tournament: every tactic on the same market, ranked by what it earned */
+.bd{margin-top:14px}
+.bd-row{display:grid;grid-template-columns:minmax(0,1fr);gap:8px 20px;padding:13px 0;border-top:1px solid var(--line);align-items:center}
+.bd-row:first-child{border-top:0;padding-top:0}
+.bd-row:last-child{padding-bottom:0}
+@media(min-width:760px){.bd-row{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) 250px}}
+.bd-name{font:700 1.08rem "Bricolage Grotesque",sans-serif;letter-spacing:-.01em;display:flex;align-items:center;flex-wrap:wrap;gap:4px 2px}
+.bd-row.lead .bd-name{color:var(--brand)}
+.bd-about{color:var(--muted);font-size:.8rem;margin-top:2px;max-width:60ch}
+.bd-bar{height:8px;position:relative;border-radius:99px;background:var(--line)}
+.bd-bar::before{content:"";position:absolute;left:50%;top:-4px;bottom:-4px;width:2px;border-radius:2px;background:var(--ink-2)}
+.bd-bar span{position:absolute;top:0;bottom:0;transition:width .8s cubic-bezier(.2,.8,.2,1),left .8s cubic-bezier(.2,.8,.2,1)}
+.bd-bar span.p{left:50%;background:var(--up);border-radius:0 99px 99px 0}
+.bd-bar span.n{background:var(--down);border-radius:99px 0 0 99px}
+.bd-num{font:700 1.05rem "Bricolage Grotesque",sans-serif}
+.bd-num small{display:block;font:500 .78rem "Schibsted Grotesk",sans-serif;color:var(--muted)}
+@media(min-width:760px){.bd-num{text-align:right}}
 
 /* boot: one orchestrated entrance */
 .boot .card,.boot .agent,.boot .ticker{opacity:0;transform:translateY(10px)}
@@ -227,7 +277,7 @@ a{color:inherit}
       </svg>
       <span>Ripcord <small>desk</small></span>
     </div>
-    <span class="pill">paper trading · Solana</span>
+    <span class="pill" id="mode">paper trading · Solana</span>
     <div class="pill live" id="live" title="Desk proverava tržište na svakih 15 sekundi">
       <svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="7" fill="none" stroke="var(--line-2)" stroke-width="2"/><circle class="t" id="ring" cx="8" cy="8" r="7" fill="none" stroke-width="2"/></svg>
       <span id="livetxt">povezujem…</span>
@@ -259,6 +309,35 @@ a{color:inherit}
       </div>
     </section>
 
+    <section class="card bd" id="bd" hidden>
+      <header><h2>Turnir taktika</h2><p>ista pijaca, isti troškovi, svako svoj papirni račun</p></header>
+      <div id="bdrows"></div>
+    </section>
+
+    <section class="card lv" id="lv" hidden>
+      <header><h2>Pravi novac</h2><p id="lvnote"></p></header>
+      <div class="lv-grid">
+        <div>
+          <div class="lv-state" id="lvstate"></div>
+          <p class="lv-why" id="lvwhy"></p>
+          <ul class="lv-pins" id="lvpins"></ul>
+        </div>
+        <div>
+          <h3>Wallet bota</h3>
+          <div class="lv-addr"><code id="lvaddr"></code><button class="btn" type="button" id="lvcopy">Kopiraj adresu</button></div>
+          <div class="lv-bal" id="lvbal"></div>
+          <p class="lv-hint" id="lvhint"></p>
+        </div>
+        <form class="lv-form" id="lvform">
+          <label>Šifra vlasnika<input type="password" id="lvcode" autocomplete="off"></label>
+          <button class="btn go" type="button" id="lvarm">Upali live</button>
+          <label>Isplata na adresu<input id="lvto" autocomplete="off" spellcheck="false" placeholder="tvoja Solana adresa"></label>
+          <button class="btn" type="button" id="lvout">Isplati sve</button>
+          <p class="lv-msg" id="lvmsg" role="status"></p>
+        </form>
+      </div>
+    </section>
+
     <div class="chain-head"><h2>Desk: šest agenata, jedan trejd</h2><p id="chainnote">danas</p></div>
     <section class="chain" id="chain"></section>
     <canvas class="pipe" id="flow" aria-hidden="true"></canvas>
@@ -285,7 +364,7 @@ a{color:inherit}
     </section>
   </main>
 
-  <p class="foot">Pravo tržište, virtuelni novac. Svaki run kreće od $20 sa ciljem $150; ako padne na nulu, kreće novi run, a greške idu u pravila. Svaki trejd plaća 1,25% po strani, $0.05 mreže i proklizavanje iz dubine pula. Nijedan agent ne koristi AI model: svaki je pravilo u kodu, da odluka traje milisekunde.</p>
+  <p class="foot">Pravo tržište, virtuelni novac. Svaki run kreće od $20 sa ciljem $150; ako padne na nulu, kreće novi run, a greške idu u pravila. Svaki trejd plaća 1,25% po strani, $0.05 mreže i proklizavanje iz dubine pula. Nijedan agent ne koristi AI model: svaki je pravilo u kodu, da odluka traje milisekunde. Sniper ne kupuje na prvi pogled: token mora da prođe sva pravila dva puta, u razmaku od dva minuta. Četiri taktike trguju istu pijacu svaka na svom papirnom računu, jer niko nije javno dokazao da ijedna radi: tabela pokazuje koja zarađuje. Pravi novac je zaključan dok taktika koju prati ne pokaže plus na 50 trejdova.</p>
 </div>
 
 <script>
@@ -294,7 +373,8 @@ const SB = 'https://xgwazrawzivaqoiwwysl.supabase.co/rest/v1/rc_state';
 const KEY = 'sb_publishable_rJinet3DRSjTdXP2vb9HEA_j6mqlvIx'; // public read-only key, RLS allows SELECT only
 const qs = new URLSearchParams(location.search).get('src');
 const FILE = qs && /^\.{0,2}\/[\w./-]+\.json$/.test(qs) && !qs.startsWith('//') ? qs : null; // same-origin json for local tests
-const HOT = 'updated_at,positions:state->positions,feed:state->feed,pulse:state->pulse,ticker:state->ticker,radar:state->radar,cashUsd:state->cashUsd,lastRun:state->lastRun,startBalanceUsd:state->startBalanceUsd,startedAt:state->startedAt,days:state->days,run:state->run,runs:state->runs';
+const HOT = 'updated_at,positions:state->positions,feed:state->feed,pulse:state->pulse,ticker:state->ticker,radar:state->radar,cashUsd:state->cashUsd,lastRun:state->lastRun,startBalanceUsd:state->startBalanceUsd,startedAt:state->startedAt,days:state->days,run:state->run,runs:state->runs,live:state->live,board:state->board';
+const ADMIN = 'https://xgwazrawzivaqoiwwysl.supabase.co/functions/v1/ripcord-admin'; // every call needs the owner code
 const COLD = 'equity:state->equity,closed:state->closed';
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -308,7 +388,7 @@ const AG = [
 ];
 const AGM = Object.fromEntries(AG.map((a) => [a.k, a]));
 const REASONS = { 'stop loss': 'stop loss', 'trailing stop': 'trailing stop', 'take profit 1': 'take profit', 'moonshot take profit': 'moonshot', 'dead coin': 'mrtav coin', 'max hold time': 'isteklo vreme', 'liquidity pulled': 'izvučena likvidnost', 'pair vanished (rug)': 'rug', 'copied wallet sold': 'wallet prodao' };
-const REJECTS = { 'no pool liquidity': 'još na pump.fun krivi', 'liquidity too low': 'premala likvidnost', 'liquidity too high': 'prevelika likvidnost', 'mcap too low': 'premali mcap', 'mcap too high': 'preveliki mcap', 'too new': 'premlad', 'too old': 'prestar', 'few buys 5m': 'malo kupovina', 'sellers win 5m': 'prodavci jači (5m)', 'bot buying 5m': 'botovi kupuju (5m)', 'no price': 'nema cene','sellers win 1h': 'prodavci jači (1h)', 'no 5m momentum': 'nema zamaha (5m)', 'candle too vertical': 'sveća prestrma', 'no 1h trend': 'nema trenda (1h)', 'already pumped': 'već ispumpan', 'low volume': 'mali volumen', 'low score': 'nizak skor', 'skeptic veto': 'Skeptic veto' };
+const REJECTS = { 'no pool liquidity': 'još na pump.fun krivi', 'liquidity too low': 'premala likvidnost', 'liquidity too high': 'prevelika likvidnost', 'mcap too low': 'premali mcap', 'mcap too high': 'preveliki mcap', 'too new': 'premlad', 'too old': 'prestar', 'few buys 5m': 'malo kupovina', 'sellers win 5m': 'prodavci jači (5m)', 'bot buying 5m': 'botovi kupuju (5m)', 'no price': 'nema cene','sellers win 1h': 'prodavci jači (1h)', 'no 5m momentum': 'nema zamaha (5m)', 'candle too vertical': 'sveća prestrma', 'no 1h trend': 'nema trenda (1h)', 'already pumped': 'već ispumpan', 'low volume': 'mali volumen', 'low score': 'nizak skor', 'skeptic veto': 'Skeptic veto', 'no confirmation': 'cena nije izdržala čekanje' };
 
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -390,6 +470,8 @@ function render() {
   drawDays(start);
   drawExits(closed);
   drawSkips(today);
+  drawBoard();
+  drawLive();
   radarData = S.radar || [];
   if (!booted) { booted = true; requestAnimationFrame(() => bootIn()); }
 }
@@ -606,7 +688,7 @@ function drawOpen() {
     const lo = Math.min(p.stop, p.lastPrice), hi = Math.max(p.peak, p.lastPrice, p.entryPrice * 1.01), span = hi - lo || 1;
     const at = (v) => Math.min(100, Math.max(0, ((v - lo) / span) * 100));
     return `<div class="row">${ava(p)}
-      <div style="min-width:0"><div class="sym"><a href="${safeUrl(p.url)}" target="_blank" rel="noopener">${esc(p.symbol)}</a>${p.tp1Done ? '<span class="tag">pola prodato</span>' : ''}</div>
+      <div style="min-width:0"><div class="sym"><a href="${safeUrl(p.url)}" target="_blank" rel="noopener">${esc(p.symbol)}</a>${p.tp1Done ? '<span class="tag">profit uzet</span>' : ''}</div>
       <div class="meta">${held(Date.now() - p.entryTs)}, uloženo ${usd(p.costUsd)}</div></div>
       <div class="pnl"><span class="s ${pnl >= 0 ? 'u' : 'd'}"></span>${usd(pnl, 1)}<small>${pct(g)}</small></div>
       <div class="ruler" title="stop, ulaz, vrh"><span style="left:${Math.min(at(p.entryPrice), at(p.lastPrice))}%;width:${Math.abs(at(p.lastPrice) - at(p.entryPrice))}%;background:${g >= 0 ? 'var(--up)' : 'var(--down)'}"></span><b style="left:${at(p.entryPrice)}%"></b></div>
@@ -693,6 +775,101 @@ function drawSkips(today) {
   const max = Math.max(1, ...rows.map((r) => n(r[1])));
   $('#skips').innerHTML = rows.map(([r, c]) => `<div class="bl"><span>${esc(REJECTS[r] || r)}</span><div class="tr"><span class="${r === 'skeptic veto' ? 'k' : ''}" style="left:0;width:${(n(c) / max) * 100}%"></span></div><em>${n(c)}</em></div>`).join('');
 }
+
+// ---------- tournament board ----------
+function drawBoard() {
+  const B = S.board || [], el = $('#bd');
+  el.hidden = B.length < 2;
+  if (el.hidden) return;
+  const rows = [...B].sort((a, b) => n(b.gate?.pnlUsd) - n(a.gate?.pnlUsd));
+  const lead = rows.find((r) => n(r.gate?.pnlUsd) > 0)?.k;
+  const max = Math.max(5, ...rows.map((r) => Math.abs(n(r.gate?.pnlUsd))));
+  const follow = S.live?.follow || 'main';
+  $('#bdrows').innerHTML = rows.map((r) => {
+    const g = r.gate || {}, v = n(g.pnlUsd), w = (Math.abs(v) / max) * 50;
+    return `<div class="bd-row ${r.k === lead ? 'lead' : ''}">
+      <div><div class="bd-name">${esc(r.label)}${r.k === lead ? '<span class="tag">vodi</span>' : ''}${r.k === follow ? '<span class="tag">pravi novac prati njega</span>' : ''}${n(r.open) ? `<span class="tag">${n(r.open)} u igri</span>` : ''}</div><div class="bd-about">${esc(r.about)}</div></div>
+      <div class="bd-bar" role="img" aria-label="${esc(r.label)}: ${usd(v, 1)}"><span class="${v >= 0 ? 'p' : 'n'}" style="${v >= 0 ? `width:${w}%` : `left:${50 - w}%;width:${w}%`}"></span></div>
+      <div class="bd-num">${usd(v, 1)}<small>${n(g.trades)} / ${n(g.need)} trejdova, PF ${n(g.trades) ? n(g.pf).toFixed(2) : '–'}, račun ${usd(n(r.eq))}</small></div>
+    </div>`;
+  }).join('');
+}
+
+// ---------- real money: gate, wallet, owner controls ----------
+function drawLive() {
+  const L = S.live, el = $('#lv');
+  el.hidden = !L?.address;
+  if (el.hidden) return;
+  const g = L.gate || { trades: 0, need: 50, pnlUsd: 0, pf: 0, minPf: 1.2 };
+  const cap = usd(n(L.capUsd) || 20), done = (L.closed || []).length;
+  $('#mode').textContent = L.active ? 'LIVE · pravi novac' : 'paper trading · Solana';
+  const st = $('#lvstate');
+  st.textContent = L.active ? 'Bot trguje pravim novcem' : g.ok ? 'Otključano, čeka tvoj prekidač' : 'Zaključano dok paper ne dokaže plus';
+  st.classList.toggle('on', !!L.active);
+  const since = g.from ? ' posle ' + new Date(g.from).toLocaleDateString('sr-Latn', { day: 'numeric', month: 'short' }) : '';
+  $('#lvwhy').textContent = L.active
+    ? `Kopira svaki paper trejd, najviše ${cap} u igri. Ako paper padne u minus, sam prodaje sve i zaključava se.`
+    : `Sva tri osigurača moraju da budu zelena pre nego što bot dotakne ijedan dolar. Broje se samo trejdovi${since}, po novim pravilima. Novac prati taktiku ${(S.board || []).find((b) => b.k === (L.follow || 'main'))?.label || 'Zamah'}.`;
+  $('#lvpins').innerHTML = [
+    [g.trades >= g.need, `${g.need} paper trejdova`, `${g.trades} / ${g.need}`],
+    [g.pnlUsd > 0, 'paper u plusu', usd(n(g.pnlUsd), 1)],
+    [g.pf >= g.minPf, `profit faktor bar ${g.minPf}`, g.trades ? n(g.pf).toFixed(2) : '–'],
+  ].map(([ok, label, val]) => `<li class="lv-pin ${ok ? 'ok' : ''}"><i></i><span>${label}${ok ? '' : ' <span class="meta">(još ne)</span>'}</span><b>${val}</b></li>`).join('');
+  $('#lvaddr').textContent = L.address;
+  $('#lvbal').innerHTML = `${n(L.sol).toFixed(4)} SOL<small>${usd(n(L.usd))}</small>`;
+  $('#lvhint').textContent = n(L.sol) > 0
+    ? `Bot nikad ne drži u igri više od ${cap}. Ostatak stoji netaknut i možeš da ga isplatiš kad hoćeš.`
+    : `Wallet je prazan. Kad osigurači pozelene, pošalji SOL na ovu adresu iz Phantoma ili sa menjačnice. Bot dira najviše ${cap}.`;
+  const word = done % 10 === 1 && done % 100 !== 11 ? 'trejd' : done % 10 >= 2 && done % 10 <= 4 && (done % 100 < 12 || done % 100 > 14) ? 'trejda' : 'trejdova';
+  $('#lvnote').textContent = done ? `pravi rezultat ${usd(n(L.pnlUsd), 1)} · ${done} ${word}` : 'još nijedan pravi trejd';
+  if (outSeen !== null && L.out && L.out.ts > outSeen) { // the withdrawal we asked for has been attempted
+    outSeen = null;
+    lvSay(L.out.err ? `Isplata nije uspela: ${L.out.err}` : `Isplaćeno ${n(L.out.sol).toFixed(4)} SOL na ${String(L.out.to).slice(0, 4)}…${String(L.out.to).slice(-4)}.`, L.out.err ? 'bad' : 'good');
+  }
+  if (lvSet && Date.now() < lvSet.until) L.on = lvSet.on; // the desk confirms the switch on its next tick; do not flicker back meanwhile
+  const arm = $('#lvarm');
+  arm.className = 'btn ' + (L.on ? 'rip' : 'go');
+  arm.textContent = L.on ? 'Povuci ripcord: prodaj sve i ugasi' : 'Upali live';
+  arm.disabled = !L.on && !g.ok;
+  arm.title = arm.disabled ? 'Otključava se kad sva tri osigurača pozelene' : '';
+}
+let lvSet = null, outSeen = null;
+function lvSay(text, tone = '') { const m = $('#lvmsg'); m.className = 'lv-msg ' + tone; m.textContent = text; }
+async function admin(action, extra) {
+  const code = $('#lvcode').value.trim();
+  if (!code) { lvSay('Upiši šifru vlasnika. Nalazi se u fajlu .admin-code u folderu bota.', 'bad'); $('#lvcode').focus(); return null; }
+  lvSay('Šaljem…');
+  try {
+    const r = await fetch(ADMIN, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code, action, ...extra }) });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || `Server je odgovorio ${r.status}.`);
+    return j;
+  } catch (e) { lvSay(e.message === 'Failed to fetch' ? 'Nema veze sa serverom. Probaj ponovo.' : e.message, 'bad'); return null; }
+}
+$('#lvarm').onclick = async () => {
+  const on = !S.live?.on;
+  if (!(await admin('live', { on }))) return;
+  lvSet = { on, until: Date.now() + 30000 }; drawLive();
+  lvSay(on ? 'Live je upaljen. Bot kupuje od sledećeg paper trejda.' : 'Ripcord povučen. Bot prodaje sve pozicije i staje.', 'good');
+};
+let outArmed = 0;
+$('#lvout').onclick = async () => {
+  const btn = $('#lvout'), to = $('#lvto').value.trim();
+  if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(to)) { lvSay('Upiši Solana adresu na koju ide isplata.', 'bad'); $('#lvto').focus(); return; }
+  if (Date.now() - outArmed > 8000) { // sending money cannot be undone: second click confirms
+    outArmed = Date.now(); btn.textContent = `Potvrdi: sve ide na ${to.slice(0, 4)}…${to.slice(-4)}`;
+    setTimeout(() => { if (Date.now() - outArmed >= 8000) btn.textContent = 'Isplati sve'; }, 8100);
+    return;
+  }
+  outArmed = 0; btn.textContent = 'Isplati sve';
+  if (await admin('withdraw', { to })) { outSeen = n(S.live?.out?.ts); lvSay('Isplata je zakazana. Bot je šalje u sledećem tiku, do 15 sekundi.', 'good'); }
+};
+$('#lvcopy').onclick = async () => {
+  const b = $('#lvcopy');
+  try { await navigator.clipboard.writeText($('#lvaddr').textContent); b.textContent = 'Kopirano'; } catch { b.textContent = 'Označi i kopiraj ručno'; }
+  setTimeout(() => (b.textContent = 'Kopiraj adresu'), 1600);
+};
+$('#lvform').onsubmit = (e) => e.preventDefault();
 
 // ---------- live ring: time since the last desk tick ----------
 function liveFrame() {

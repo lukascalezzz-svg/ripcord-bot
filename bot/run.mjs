@@ -4,6 +4,8 @@
 // Skeptic vetoes, Sniper sizes the entry, Guard manages exits.
 // Runtime-agnostic: Node runs tests/local loops, Supabase (Deno) runs the live desk.
 
+import { gate } from './live.mjs';
+
 const DS = 'https://api.dexscreener.com';
 const QUOTES = new Set([
   'So11111111111111111111111111111111111111112',
@@ -14,7 +16,13 @@ const MIN = 60_000;
 const num = (v) => Number(v) || 0;
 const day = (ts) => new Date(ts).toISOString().slice(0, 10);
 
+// while runAll is running, every bot shares one answer per URL: more bots cost no extra API calls
+let memo = null;
 async function get(url, init) {
+  if (memo && !init) {
+    if (!memo.has(url)) memo.set(url, get(url, {}));
+    return memo.get(url);
+  }
   const r = await fetch(url, { ...init, signal: AbortSignal.timeout(10_000) });
   if (!r.ok) throw new Error(`${r.status} ${url.slice(0, 80)}`);
   return r.json();
@@ -69,6 +77,7 @@ export function entryReject(p, now, e) {
   if (chM5 > e.maxChangeM5) return 'candle too vertical';
   if (chH1 < e.minChangeH1) return 'no 1h trend';
   if (chH1 > e.maxChangeH1) return 'already pumped';
+  if (e.minChangeH6 != null && num(p.priceChange?.h6) < e.minChangeH6) return 'no earlier pump';
   if (volLiq < e.minVolLiqH1) return 'low volume';
   if (score(p) < e.minScore) return 'low score';
   return null;
@@ -86,7 +95,7 @@ export function features(p, now) {
     ageMin: Math.round((now - num(p.pairCreatedAt)) / MIN),
     buysM5: num(p.txns?.m5?.buys), sellsM5: num(p.txns?.m5?.sells),
     chM5: num(p.priceChange?.m5), chH1: num(p.priceChange?.h1),
-    volH1: Math.round(num(p.volume?.h1)), score: +score(p).toFixed(2), dex: p.dexId,
+    volH1: Math.round(num(p.volume?.h1)), score: +score(p).toFixed(2), dex: p.dexId, src: p.src || 'boost',
   };
 }
 
@@ -146,7 +155,7 @@ export function exitDecision(pos, price, liq, now, x) {
 }
 
 // ---------- data sources ----------
-async function discover() {
+async function discover(state, now) {
   const lists = await Promise.allSettled([
     get(`${DS}/token-profiles/latest/v1`),
     get(`${DS}/token-boosts/latest/v1`),
@@ -154,7 +163,18 @@ async function discover() {
   ]);
   const mints = new Set();
   for (const l of lists) if (l.status === 'fulfilled') for (const t of l.value) if (t.chainId === 'solana') mints.add(t.tokenAddress);
-  return [...mints];
+  // Everything above paid to be listed. GeckoTerminal trending is organic: nobody bought a place on it.
+  // Its free API is slow to forgive, so ask once a minute and keep the last answer.
+  const t = (state.trend ||= { ts: 0, mints: [] });
+  if (now - t.ts >= MIN) {
+    t.ts = now;
+    try {
+      t.mints = (await get('https://api.geckoterminal.com/api/v2/networks/solana/trending_pools?duration=5m')).data
+        .map((d) => d.relationships.base_token.data.id.replace('solana_', ''));
+    } catch (err) { console.warn('trend', err.message); }
+  }
+  const trendOnly = new Set(t.mints.filter((m) => !mints.has(m)));
+  return { mints: [...mints, ...trendOnly], trendOnly };
 }
 
 // best pool per mint (deepest liquidity, quoted in SOL/USDC/USDT).
@@ -262,7 +282,7 @@ export async function tick(state, cfg, now = Date.now(), env = {}) {
         pos.tp1Done = true; pos.stop = Math.max(pos.entryPrice, pos.peak * (1 - cfg.exit.trailPct)); // never give back the win
         pos.events.push({ ts: now, what: d.why, price, usd: +got.toFixed(2) });
         bump(today, 'guard');
-        say(state, 'guard', `${pos.symbol}: prodao pola na +${((price / pos.entryPrice - 1) * 100).toFixed(0)}%, stop podignut na ulaz`, { mint: pos.mint, tone: 'up' });
+        say(state, 'guard', `${pos.symbol}: prodao ${Math.round(cfg.exit.tp1SellFraction * 100)}% na +${((price / pos.entryPrice - 1) * 100).toFixed(0)}%, stop podignut na ulaz`, { mint: pos.mint, tone: 'up' });
       }
     }
   }
@@ -272,9 +292,10 @@ export async function tick(state, cfg, now = Date.now(), env = {}) {
   // Scout
   mark('scout');
   const heldSet = new Set(state.positions.map((p) => p.mint));
-  const found = await discover();
-  const mints = [...new Set([...found, ...buys.keys()])].filter((m) => !heldSet.has(m) && !(state.cooldown[m] > now));
+  const found = await discover(state, now);
+  const mints = [...new Set([...found.mints, ...buys.keys()])].filter((m) => !heldSet.has(m) && !(state.cooldown[m] > now));
   const pairs = await pairsFor(mints);
+  for (const [mint, p] of pairs) if (found.trendOnly.has(mint)) p.src = 'trend'; // so the review can grade each source
   bump(today, 'scout', pairs.size);
   today.scanned += pairs.size;
   const live = [...pairs.values()].filter((p) => num(p.liquidity?.usd) > 0).sort((a, b) => num(b.volume?.h1) - num(a.volume?.h1)).slice(0, 14);
@@ -332,6 +353,27 @@ export async function tick(state, cfg, now = Date.now(), env = {}) {
     const usd = Math.min(state.cashUsd, Math.max(minUsd, equity(state) * (copied ? cfg.copyPositionPct : cfg.positionPct)));
     if (usd < minUsd) { shadowAdd(state, p, 'nema keša', now, cfg); break; }
     const price = num(p.priceUsd), liq = num(p.liquidity?.usd);
+    // Two-look entry: most losers dumped within minutes of the first look. The first pass only starts a clock;
+    // we buy when the token still passes every rule confirmMin later and the price has held.
+    const en = cfg.entry;
+    if (en.confirmMin && !copied) {
+      const w = (state.watch ||= {})[mint];
+      if (!w) {
+        state.watch[mint] = { ts: now, p0: price };
+        shadowAdd(state, p, 'prvi pogled', now, cfg);
+        say(state, 'sniper', `${sym}: ne kupujem na prvi pogled, čekam ${en.confirmMin} min da cena izdrži.`, { mint });
+        continue;
+      }
+      if (now - w.ts < en.confirmMin * MIN) continue;
+      delete state.watch[mint];
+      const g = price / w.p0 - 1;
+      if (g < en.confirmMinGain || g > en.confirmMaxGain) {
+        today.rejects['no confirmation'] = (today.rejects['no confirmation'] || 0) + 1;
+        state.cooldown[mint] = now + 15 * MIN;
+        say(state, 'sniper', `${sym}: nije potvrdio (${g >= 0 ? '+' : '−'}${Math.abs(g * 100).toFixed(0)}% od prvog pogleda), preskačem.`, { mint, tone: 'down' });
+        continue;
+      }
+    }
     const qty = buyFill(usd, price, liq, fee, fixed);
     shadowAdd(state, p, 'kupljeno', now, cfg);
     state.cashUsd -= usd;
@@ -348,6 +390,33 @@ export async function tick(state, cfg, now = Date.now(), env = {}) {
     say(state, 'sniper', `${sym}: kupljeno $${usd.toFixed(2)}, stop ${(cfg.exit.stopLossPct * 100).toFixed(0)}%`, { mint, tone: 'up' });
   }
   state.lastRun = now;
+}
+
+// ---------- tournament: the house desk plus challenger tactics, each with its own paper book ----------
+// Nobody has published proof that any meme coin tactic works, so the desk does not pick one on faith:
+// every tactic in cfg.lab trades the same live market under the same costs, and the board shows who earns it.
+export async function runAll(state, cfg, now = Date.now(), env = {}) {
+  memo = new Map();
+  try {
+    await tick(state, cfg, now, env);
+    state.lab ||= {};
+    const row = (k, c, s) => ({ k, label: c.label || k, about: c.about || '', eq: +equity(s).toFixed(2), run: s.run.n, open: s.positions.length, gate: gate(s, cfg), say: s.feed.at(-1)?.text || '' });
+    const board = [row('main', cfg, state)];
+    for (const [k, b] of Object.entries(cfg.lab || {})) {
+      if (typeof b !== 'object') continue; // "_note" in config.json
+      const c = { ...cfg, ...b, entry: { ...cfg.entry, ...b.entry }, exit: { ...cfg.exit, ...b.exit }, shadow: null, copy: { ...cfg.copy, wallets: [] } };
+      const s = (state.lab[k] ||= freshState(c, now));
+      s.rug = state.rug; s.trend = state.trend; // one RugCheck verdict and one trending list for everyone
+      try { await tick(s, c, now, env); } catch (err) { console.warn('lab', k, err.message); }
+      finish(s, now);
+      delete s.rug; delete s.trend;
+      s.feed = s.feed.slice(-3); s.ticker = []; s.radar = []; s.shadow = [];
+      s.closed = s.closed.slice(-150).map(({ analysis, img, url, name, ...t }) => t);
+      board.push(row(k, c, s));
+    }
+    for (const k of Object.keys(state.lab)) if (!cfg.lab?.[k]) delete state.lab[k];
+    state.board = board;
+  } finally { memo = null; }
 }
 
 function closePos(state, pos, proceeds, why, now, cfg, today) {
@@ -437,6 +506,7 @@ export function finish(state, now = Date.now()) {
   state.equity = thin.filter(([t]) => now - t < 30 * 24 * 60 * MIN);
   for (const [m, t] of Object.entries(state.cooldown)) if (t < now) delete state.cooldown[m];
   for (const [m, c] of Object.entries(state.rug)) if (now - c.ts > 2 * 60 * MIN) delete state.rug[m];
+  for (const [m, w] of Object.entries(state.watch || {})) if (now - w.ts > 10 * MIN) delete state.watch[m]; // fell out of the filter while waiting
   state.feed = state.feed.slice(-80);
   state.radar = state.radar.slice(-24);
   state.closed = state.closed.slice(-500);

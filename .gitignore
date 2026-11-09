@@ -2,3 +2,5 @@ node_modules
 .vercel
 data/demo.json
 data/local-state.json
+.admin-code
+data/candles.json
